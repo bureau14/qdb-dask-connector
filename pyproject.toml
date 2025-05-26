@@ -8,12 +8,13 @@ authors = [
 ]
 description = "Integration between QuasarDB's Python API and Dask DataFrame"
 dependencies = [
-    "quasardb",
-    "dask[dataframe]",
-    "dask[delayed]",
+    "dask[complete]",
     "pandas",
     "dateparser"
 ]
+
+[project.optional-dependencies]
+qdb-api-python = ["quasardb"]
 
 [build-system]
 requires = ["setuptools", "build", "wheel"]
