@@ -219,7 +219,7 @@ def _get_tasks_from_rest_api(
     )
 
 
-def _get_subqueries_from_python_client(
+def _get_tasks_from_python_client(
     query: str, conn_kwargs: dict, query_kwargs: dict
 ) -> tuple[list[str], pd.DataFrame]:
     table_name = _extract_table_name_from_query(query)
@@ -230,24 +230,19 @@ def _get_subqueries_from_python_client(
 
 def query(
     query: str,
+    *,
     cluster_uri: str,
     # rest api options
-    rest_api_uri: str = "",
-    *,
+    rest_uri: str = "",
     # python api options
     user_name: str = "",
     user_private_key: str = "",
     cluster_public_key: str = "",
-    user_security_file: str = "",
-    cluster_public_key_file: str = "",
     timeout: datetime.timedelta = datetime.timedelta(seconds=60),
-    do_version_check: bool = False,
     enable_encryption: bool = False,
     client_max_parallelism: int = 0,
     # query options
-    index=None,
-    blobs: bool = False,
-    numpy: bool = False,
+    index: str | int = None,
 ):
     if not re.match(general_select_pattern, query):
         raise NotImplementedError(
@@ -259,25 +254,20 @@ def query(
         "user_name": user_name,
         "user_private_key": user_private_key,
         "cluster_public_key": cluster_public_key,
-        "user_security_file": user_security_file,
-        "cluster_public_key_file": cluster_public_key_file,
         "timeout": timeout,
-        "do_version_check": do_version_check,
         "enable_encryption": enable_encryption,
         "client_max_parallelism": client_max_parallelism,
     }
 
     query_kwargs = {
         "index": index,
-        "blobs": blobs,
-        "numpy": numpy,
     }
 
-    if rest_api_uri:
-        subqueries, meta = _get_tasks_from_rest_api(query, rest_api_uri)
+    if rest_uri:
+        subqueries, meta = _get_tasks_from_rest_api(query, rest_uri)
     else:
         _ensure_python_api_imported()
-        subqueries, meta = _get_subqueries_from_python_client(
+        subqueries, meta = _get_tasks_from_python_client(
             query, conn_kwargs, query_kwargs
         )
 
