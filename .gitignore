@@ -184,4 +184,5 @@ secure/
 user_private.key
 users.cfg
 
+# local log files
 qdbd*log*
