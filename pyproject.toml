@@ -20,6 +20,9 @@ qdb-api-python = ["quasardb"]
 requires = ["setuptools", "build", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools]
+package-dir = {"" = "qdb_dask_connector"}
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 

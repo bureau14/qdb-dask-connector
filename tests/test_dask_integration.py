@@ -86,3 +86,6 @@ def test_dask_compute_on_local_cluster(df_with_table, qdbd_connection, qdbd_sett
             ddf = qdbdsk.query(query, qdbd_settings.get("uri").get("insecure"))
             res = ddf.compute()
             res.head()
+
+
+# we will need some tests for dask the math operations

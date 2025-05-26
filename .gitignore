@@ -172,3 +172,16 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Where qdb files are stored
+qdb/
+
+# Test specific
+cluster_private.key
+cluster_public.key
+insecure/
+secure/
+user_private.key
+users.cfg
+
+qdbd*log*
