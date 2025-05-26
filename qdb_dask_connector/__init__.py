@@ -42,18 +42,35 @@ except ImportError as err:
         "Dateparser library is required to use QuasarDB dask integration."
     ) from err
 
-### Dask integration can be used with either the QuasarDB Python client or the REST API.
-# The default is to use the Python client if available, if not, it will fall back to the REST API.
 
-CLIENT_MODE = "PYTHON_API"
+class QdbPythonApiRequired(ImportError):
+    """
+    Exception raised when trying to use QuasarDB dask integration, but
+    required packages are not installed.
+    """
+
+    pass
+
+
 try:
     import quasardb
     import quasardb.pandas as qdbpd
 except ImportError as err:
-    logger.warning(
-        "quasardb or quasardb.pandas not found, will utilize QuasarDB REST API."
-    )
-    CLIENT_MODE = "REST_API"
+    pass
+
+
+def _ensure_python_api_imported():
+    try:
+        import quasardb
+        import quasardb.pandas as qdbpd
+    except ImportError as err:
+        raise QdbPythonApiRequired(
+            "QuasarDB Python API is missing from your environment. "
+            "QuasarDB dask integration can work with either REST API or Python API. "
+            "Please install 'quasardb' package if you want to use the Python API client mode. "
+            "If you want to use the REST API client mode, please provide the 'rest_api_uri' parameter. to `query` function."
+        )
+
 
 # REGEX patterns used to parse the query
 general_select_pattern = re.compile(r"(?i)^\s*SELECT\b")
@@ -189,7 +206,17 @@ def _get_meta(conn, query: str, query_kwargs: dict) -> pd.DataFrame:
 def _get_tasks_from_rest_api(
     query: str, rest_api_uri: str
 ) -> tuple[list[str], pd.DataFrame]:
-    return ["select * from test"], pd.DataFrame()
+    raise NotImplementedError(
+        "REST API client mode is not implemented yet. Please use the Python API client mode."
+    )
+    # XXX:igor i used this code to validate that dask integration can work even when quasardb api is not installed
+    return [query], pd.DataFrame(
+        {
+            "$timestamp": pd.Series(dtype="datetime64[ns]"),
+            "$table": pd.Series(dtype="object"),
+            "x": pd.Series(dtype="float64"),
+        }
+    )
 
 
 def _get_subqueries_from_python_client(
@@ -204,7 +231,6 @@ def _get_subqueries_from_python_client(
 def query(
     query: str,
     cluster_uri: str,
-    client_mode: str = None,
     # rest api options
     rest_api_uri: str = "",
     *,
@@ -228,12 +254,6 @@ def query(
             "Only SELECT queries are supported. Please refer to the documentation for more information."
         )
 
-    global CLIENT_MODE
-    if client_mode:
-        if client_mode not in ["PYTHON_API", "REST_API"]:
-            raise ValueError("client_mode must be either 'PYTHON_API' or 'REST_API'.")
-        CLIENT_MODE = client_mode
-
     conn_kwargs = {
         "uri": cluster_uri,
         "user_name": user_name,
@@ -253,17 +273,13 @@ def query(
         "numpy": numpy,
     }
 
-    if CLIENT_MODE == "PYTHON_API":
+    if rest_api_uri:
+        subqueries, meta = _get_tasks_from_rest_api(query, rest_api_uri)
+    else:
+        _ensure_python_api_imported()
         subqueries, meta = _get_subqueries_from_python_client(
             query, conn_kwargs, query_kwargs
         )
-    elif CLIENT_MODE == "REST_API":
-        if not rest_api_uri:
-            raise ValueError(
-                "REST API URI must be provided when using REST API client mode."
-            )
-        conn_kwargs["uri"] = rest_api_uri
-        subqueries, meta = _get_tasks_from_rest_api(query, rest_api_uri)
 
     if len(subqueries) == 0:
         logging.warning("No subqueries, returning empty dataframe")
