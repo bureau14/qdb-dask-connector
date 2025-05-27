@@ -4,7 +4,7 @@ import logging
 import conftest
 from utils import *
 import dask.dataframe as dd
-import qdb_dask_connector as qdbdsk
+import quasardb_dask as qdbdsk
 from dask.distributed import LocalCluster, Client
 
 logger = logging.getLogger("test-dask-integration")

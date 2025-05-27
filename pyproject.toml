@@ -1,6 +1,6 @@
 [project]
 requires-python = ">=3.12"
-name = "qdb-dask-connector"
+name = "quasardb-dask"
 version = "0.1-dev"
 authors = [
     {name = "quasardb SAS"},
@@ -21,7 +21,7 @@ requires = ["setuptools", "build", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-package-dir = {"qdb_dask_connector" = "qdb_dask_connector/"}
+package-dir = {"quasardb_dask" = "qdb_dask_connector/"}
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

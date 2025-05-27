@@ -40,7 +40,7 @@ ${VENV_PYTHON} -m build --wheel
 # install wheel
 echo "Installing built wheel"
 
-${VENV_PYTHON} -m pip install --no-deps --force-reinstall dist/qdb*.whl
+${VENV_PYTHON} -m pip install --no-deps --force-reinstall dist/quasardb_dask*.whl
 
 
 echo "Invoking pytest"

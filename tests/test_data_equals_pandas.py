@@ -2,7 +2,7 @@ import math
 import pytest
 import quasardb
 import quasardb.pandas as qdbpd
-import qdb_dask_connector as qdbdsk
+import quasardb_dask as qdbdsk
 import logging
 import conftest
 from utils import *
