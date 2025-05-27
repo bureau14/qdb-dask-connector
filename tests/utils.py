@@ -67,9 +67,7 @@ def prepare_query_test(
     return (df, table, q)
 
 
-def get_subrange(
-    df: pd.DataFrame, slice_size: int = 0.1
-) -> tuple[str, str]:
+def get_subrange(df: pd.DataFrame, slice_size: int = 0.1) -> tuple[str, str]:
     """
     Returns slice of the Dataframe index to be used in the query.
     """
