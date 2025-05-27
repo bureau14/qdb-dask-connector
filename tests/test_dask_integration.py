@@ -23,9 +23,6 @@ logger = logging.getLogger("test-dask-integration")
     ],
 )
 def test_dask_query_exception_on_non_select_query(qdbd_settings, query):
-    """
-    Tests that a non-select query raises an exception
-    """
     with pytest.raises(NotImplementedError):
         qdbdsk.query(query, cluster_uri=qdbd_settings.get("uri").get("insecure"))
 
@@ -76,6 +73,9 @@ def test_dask_query_lazy_evaluation(df_with_table, qdbd_connection, qdbd_setting
 @pytest.mark.parametrize("row_count", [224], ids=["row_count=224"], indirect=True)
 @pytest.mark.parametrize("sparsify", [100], ids=["sparsify=none"], indirect=True)
 def test_dask_query_parallelized(df_with_table, qdbd_connection, qdbd_settings):
+    """
+    tests that query is split into multiple partitions
+    """
     _, _, df, table = df_with_table
     shard_size = table.get_shard_size()
     start, end = df.index[0], df.index[-1]
@@ -85,11 +85,13 @@ def test_dask_query_parallelized(df_with_table, qdbd_connection, qdbd_settings):
     ddf = qdbdsk.query(query, cluster_uri=qdbd_settings.get("uri").get("insecure"))
 
     # value of npartitions determines number of delayed tasks
-    # delayed tasks can be executed in parallel
+    # delayed tasks can be executed in parallel on dask cluster
+
     # currently tasks are created for each shard
     expected_number_of_partitions = math.ceil(
         (end - start).total_seconds() / shard_size.total_seconds()
     )
+
     assert ddf.npartitions == expected_number_of_partitions
     assert ddf.npartitions > 1, "Dask DataFrame should have multiple partitions"
 
@@ -98,6 +100,9 @@ def test_dask_query_parallelized(df_with_table, qdbd_connection, qdbd_settings):
 @pytest.mark.parametrize("row_count", [224], ids=["row_count=224"], indirect=True)
 @pytest.mark.parametrize("sparsify", [100], ids=["sparsify=none"], indirect=True)
 def test_dask_compute_on_local_cluster(df_with_table, qdbd_connection, qdbd_settings):
+    """
+    tests that dask integration can be used with dask cluster
+    """
     _, _, query = prepare_query_test(df_with_table, qdbd_connection)
 
     with LocalCluster(n_workers=2) as cluster:
@@ -113,6 +118,9 @@ def test_dask_compute_on_local_cluster(df_with_table, qdbd_connection, qdbd_sett
 def test_dask_can_do_math_on_dask_dataframe(
     df_with_table, qdbd_connection, qdbd_settings
 ):
+    """
+    tests that dask.dataframe operations are supported for dask integration
+    """
     df, _, query = prepare_query_test(df_with_table, qdbd_connection)
     ddf = qdbdsk.query(query, cluster_uri=qdbd_settings.get("uri").get("insecure"))
 
@@ -126,6 +134,6 @@ def test_dask_can_do_math_on_dask_dataframe(
 
     result = ddf.compute()
 
-    assert f"sum_{number_column}" in result.columns, "Sum column not found"
-    assert f"mean_{number_column}" in result.columns, "Mean column not found"
-    assert f"std_{number_column}" in result.columns, "Std column not found"
+    assert f"sum_{number_column}" in result.columns
+    assert f"mean_{number_column}" in result.columns
+    assert f"std_{number_column}" in result.columns

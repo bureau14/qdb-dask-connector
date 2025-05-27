@@ -9,7 +9,7 @@ logger = logging.getLogger("qdb-dask-connector")
 class DaskRequired(ImportError):
     """
     Exception raised when trying to use QuasarDB dask integration, but
-    required packages are not installed.
+    dask package is not installed.
     """
 
     pass
@@ -20,15 +20,12 @@ try:
     from dask.delayed import delayed
 except ImportError as err:
     logger.exception(err)
-    raise DaskRequired(
-        "The dask library is required to use QuasarDB dask integration."
-    ) from err
+    raise DaskRequired("The dask package is required to use this module.") from err
 
 
-class DateParserRequired(ImportError):
+class DateparserRequired(ImportError):
     """
-    Exception raised when trying to use QuasarDB dask integration, but
-    required packages are not installed.
+    Exception raised when trying to use QuasarDB dask integration, but dateparser package is not installed.
     """
 
     pass
@@ -38,15 +35,15 @@ try:
     import dateparser
 except ImportError as err:
     logger.exception(err)
-    raise DaskRequired(
-        "Dateparser library is required to use QuasarDB dask integration."
+    raise DateparserRequired(
+        "Dateparser package is required to use QuasarDB dask integration."
     ) from err
 
 
 class QdbPythonApiRequired(ImportError):
     """
-    Exception raised when trying to use QuasarDB dask integration, but
-    required packages are not installed.
+    Exception raised when trying to use QuasarDB dask integration, in Python API client mode,
+    but quasardb package is not installed.
     """
 
     pass
@@ -68,7 +65,7 @@ def _ensure_python_api_imported():
             "QuasarDB Python API is missing from your environment. "
             "QuasarDB dask integration can work with either REST API or Python API. "
             "Please install 'quasardb' package if you want to use the Python API client mode. "
-            "If you want to use the REST API client mode, please provide the 'rest_api_uri' parameter. to `query` function."
+            "If you want to use the REST API client mode, please provide the 'rest_uri' parameter to `query` function."
         )
 
 
@@ -95,6 +92,8 @@ def _read_dataframe(
 
 
 def _extract_table_name_from_query(query: str) -> str:
+    # this function is used to mock part of future c api functionality
+
     # XXX:igor for now this works for queries using one table
     # tags and multiple tables are not supported yet
 
@@ -113,6 +112,7 @@ def _extract_range_from_query(conn, query: str, table_name: str) -> tuple:
     Extracts the range from the query, parses it to datetime and returns.
     If no range is found in the query, it queries the table for the first and last timestamp.
     """
+    # this function is used to mock part of future c api functionality
     logger.debug('Extracting query range from: "%s"', query)
     match = re.search(range_pattern, query)
     # first we check try to extract "in range (start, end)" from query
@@ -147,6 +147,7 @@ def _extract_range_from_query(conn, query: str, table_name: str) -> tuple:
 def _create_subrange_query(
     query: str, query_range: tuple[datetime.datetime, datetime.datetime]
 ) -> str:
+    # this function is used to mock part of future c api functionality
     """
     Adds range to base query.
     IF range is found in the query, it will be replaced with the new range.
@@ -177,7 +178,7 @@ def _create_subrange_query(
 
 
 def _get_subqueries(conn, query: str, table_name: str) -> list[str]:
-    # this will be moved to c++ functions in the future
+    # this function is used to mock part of future c api functionality
     shard_size = conn.table(table_name.replace('"', "")).get_shard_size()
     start, end = _extract_range_from_query(conn, query, table_name)
     ranges_to_query = conn.split_query_range(start, end, shard_size)

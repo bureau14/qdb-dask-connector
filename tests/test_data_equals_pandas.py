@@ -10,8 +10,8 @@ from utils import *
 logger = logging.getLogger("test-dask-data-equals-pandas")
 
 ### Query tests, we care about results of dask query matching those of pandas
+# we check that each query is split into multiple dask partitions
 # when using default index, it has to be reset to match pandas DataFrame.
-# we need to check that each query is split into multiple dask partitions
 #
 # index for a Dask DataFrame will not be monotonically increasing from 0.
 # Instead, it will restart at 0 for each partition (e.g. index1 = [0, ..., 10], index2 = [0, ...]).
