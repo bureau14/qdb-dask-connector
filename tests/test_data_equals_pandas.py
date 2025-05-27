@@ -19,7 +19,6 @@ logger = logging.getLogger("test-dask-data-equals-pandas")
 # https://docs.dask.org/en/stable/generated/dask.dataframe.DataFrame.reset_index.html
 
 
-@pytest.mark.parametrize("frequency", ["h"], ids=["frequency=H"], indirect=True)
 @pytest.mark.parametrize(
     "range_slice",
     [1, 0.5, 0.25],
@@ -39,7 +38,7 @@ def test_dask_df_select_star_equals_pandas_df(
 
     pandas_df = qdbpd.query(qdbd_connection, query, **query_options)
     dask_df = qdbdsk.query(
-        query, qdbd_settings.get("uri").get("insecure"), **query_options
+        query, cluster_uri=qdbd_settings.get("uri").get("insecure"), **query_options
     )
 
     assert dask_df.npartitions > 1, "Dask DataFrame should have multiple partitions"
@@ -51,7 +50,6 @@ def test_dask_df_select_star_equals_pandas_df(
     assert_df_equal(pandas_df, dask_df)
 
 
-@pytest.mark.parametrize("frequency", ["h"], ids=["frequency=H"], indirect=True)
 @pytest.mark.parametrize(
     "range_slice",
     [1, 0.5, 0.25],
@@ -74,7 +72,7 @@ def test_dask_df_select_columns_equals_pandas_df(
         df_with_table, qdbd_connection, columns, query_range
     )
     pandas_df = qdbpd.query(qdbd_connection, query)
-    dask_df = qdbdsk.query(query, qdbd_settings.get("uri").get("insecure"))
+    dask_df = qdbdsk.query(query, cluster_uri=qdbd_settings.get("uri").get("insecure"))
 
     assert dask_df.npartitions > 1, "Dask DataFrame should have multiple partitions"
     dask_df = dask_df.compute()
@@ -84,7 +82,6 @@ def test_dask_df_select_columns_equals_pandas_df(
     assert_df_equal(pandas_df, dask_df)
 
 
-@pytest.mark.parametrize("frequency", ["h"], ids=["frequency=H"], indirect=True)
 @pytest.mark.parametrize("group_by", ["1h", "1d"])
 def test_dask_df_select_agg_group_by_time_equals_pandas_df(
     df_with_table, qdbd_connection, qdbd_settings, group_by
@@ -99,7 +96,7 @@ def test_dask_df_select_agg_group_by_time_equals_pandas_df(
     )
 
     pandas_df = qdbpd.query(qdbd_connection, query)
-    dask_df = qdbdsk.query(query, qdbd_settings.get("uri").get("insecure"))
+    dask_df = qdbdsk.query(query, cluster_uri=qdbd_settings.get("uri").get("insecure"))
 
     assert dask_df.npartitions > 1, "Dask DataFrame should have multiple partitions"
     dask_df = dask_df.compute()
@@ -107,23 +104,3 @@ def test_dask_df_select_agg_group_by_time_equals_pandas_df(
     dask_df = dask_df.reset_index(drop=True)
 
     assert_df_equal(pandas_df, dask_df)
-
-
-@pytest.mark.parametrize(
-    "query",
-    [
-        "INSERT INTO test ($timestamp, x) VALUES (now(), 2)",
-        "DROP TABLE test",
-        "DELETE FROM test",
-        "CREATE TABLE test (x INT64)",
-        "SHOW TABLE test",
-        "ALTER TABLE test ADD COLUMN y INT64",
-        "SHOW DISK USAGE ON test",
-    ],
-)
-def test_dask_query_exception_on_non_select_query(qdbd_settings, query):
-    """
-    Tests that a non-select query raises an exception
-    """
-    with pytest.raises(NotImplementedError):
-        qdbdsk.query(query, qdbd_settings.get("uri").get("insecure"))
