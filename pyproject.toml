@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-qdb-api-python = ["quasardb"]
+python = ["quasardb"]
 
 [build-system]
 requires = ["setuptools", "build", "wheel"]
