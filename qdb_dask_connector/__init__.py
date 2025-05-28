@@ -2,28 +2,12 @@ import re
 import sys
 import logging
 import datetime
+import dateparser
 import pandas as pd
 import dask.dataframe as dd
 from dask.delayed import delayed
 
 logger = logging.getLogger("quasardb_dask")
-
-
-class DateparserRequired(ImportError):
-    """
-    Exception raised when trying to use QuasarDB dask integration, but dateparser package is not installed.
-    """
-
-    pass
-
-
-try:
-    import dateparser
-except ImportError as err:
-    logger.exception(err)
-    raise DateparserRequired(
-        "Dateparser package is required to use QuasarDB dask integration."
-    ) from err
 
 
 class QdbPythonApiRequired(ImportError):
