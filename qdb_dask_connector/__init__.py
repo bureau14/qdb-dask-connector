@@ -1,26 +1,12 @@
+import re
+import sys
 import logging
 import datetime
-import re
 import pandas as pd
+import dask.dataframe as dd
+from dask.delayed import delayed
 
-logger = logging.getLogger("qdb-dask-connector")
-
-
-class DaskRequired(ImportError):
-    """
-    Exception raised when trying to use QuasarDB dask integration, but
-    dask package is not installed.
-    """
-
-    pass
-
-
-try:
-    import dask.dataframe as dd
-    from dask.delayed import delayed
-except ImportError as err:
-    logger.exception(err)
-    raise DaskRequired("The dask package is required to use this module.") from err
+logger = logging.getLogger("quasardb_dask")
 
 
 class DateparserRequired(ImportError):
@@ -53,14 +39,28 @@ try:
     import quasardb
     import quasardb.pandas as qdbpd
 except ImportError as err:
-    pass
+    logging.warning(
+        "QuasarDB Python API is not installed. "
+        "QuasarDB Dask integration can work with either REST API or Python API for client calls "
+        "QuasarDB Python API is still required on the server side of Dask. "
+    )
+    logger.exception(err)
 
 
 def _ensure_python_api_imported():
-    try:
-        import quasardb
-        import quasardb.pandas as qdbpd
-    except ImportError as err:
+    """
+    qdb-dask-connector can work in two modes client side:
+    1. Python API client mode
+    2. REST API client mode
+
+    This allows decoupling of QuasarDB Python API from Dask integration (CLIENT SIDE ONLY, Python API is still required on the server side of Dask).
+    In big deployments, with many Dask clients it means that clients don't have to install and keep QuasarDB Python API up to date.
+
+    If wants to use Python API client mode we need to check if quasardb package is imported.
+    If not, we raise an ImportError.
+    """
+
+    if "quasardb" not in sys.modules or "qdbpd" not in sys.modules:
         raise QdbPythonApiRequired(
             "QuasarDB Python API is missing from your environment. "
             "QuasarDB dask integration can work with either REST API or Python API. "
@@ -79,7 +79,7 @@ def _read_dataframe(
     query: str, meta: pd.DataFrame, conn_kwargs: dict, query_kwargs: dict
 ):
     """
-    Creates connection and queries cluster with passed query.
+    Creates connection and queries cluster with passed query, server side of Dask.
     """
     logger.debug('Querying QuasarDB with query: "%s"', query)
     with quasardb.Cluster(**conn_kwargs) as conn:
@@ -164,7 +164,7 @@ def _create_subrange_query(
                 f"IN RANGE ({start_str}, {end_str})",
                 query,
             )
-        logger.debug("Created subquery: %s", new_query)
+        logger.debug("Created query: %s", new_query)
         return new_query
 
     table_match = re.search(table_pattern, query)
@@ -173,20 +173,20 @@ def _create_subrange_query(
         f"FROM {table_match.group(1)} IN RANGE ({start_str}, {end_str})",
         query,
     )
-    logger.debug("Created subquery: %s", new_query)
+    logger.debug("Created query: %s", new_query)
     return new_query
 
 
-def _get_subqueries(conn, query: str, table_name: str) -> list[str]:
+def _split_query(conn, query: str, table_name: str) -> list[str]:
     # this function is used to mock part of future c api functionality
     shard_size = conn.table(table_name.replace('"', "")).get_shard_size()
     start, end = _extract_range_from_query(conn, query, table_name)
     ranges_to_query = conn.split_query_range(start, end, shard_size)
 
-    subqueries = []
+    split_queries = []
     for rng in ranges_to_query:
-        subqueries.append(_create_subrange_query(query, rng))
-    return subqueries
+        split_queries.append(_create_subrange_query(query, rng))
+    return split_queries
 
 
 def _get_meta(conn, query: str, query_kwargs: dict) -> pd.DataFrame:
@@ -204,9 +204,16 @@ def _get_meta(conn, query: str, query_kwargs: dict) -> pd.DataFrame:
     return df
 
 
-def _get_tasks_from_rest_api(
+def get_tasks_from_rest_api(
     query: str, rest_api_uri: str
 ) -> tuple[list[str], pd.DataFrame]:
+    """
+    Connects to QuasarDB cluster using QuasarDB Rest API and:
+    1. Extracts expected schema of the query result
+    2. Splits the query into smaller queries which can be executed on Dask cluster in parallel.
+
+    Requires QuasarDB Rest API to be running and accessible at the provided `rest_api_uri`.
+    """
     raise NotImplementedError(
         "REST API client mode is not implemented yet. Please use the Python API client mode."
     )
@@ -220,13 +227,20 @@ def _get_tasks_from_rest_api(
     )
 
 
-def _get_tasks_from_python_client(
+def get_tasks_from_python_api(
     query: str, conn_kwargs: dict, query_kwargs: dict
 ) -> tuple[list[str], pd.DataFrame]:
+    """
+    Connects to QuasarDB cluster using Python API and:
+    1. Extracts expected schema of the query result
+    2. Splits the query into smaller queries which can be executed on Dask cluster in parallel.
+
+    Requires up-to date QuasarDB Python API to be installed in the environment.
+    """
     table_name = _extract_table_name_from_query(query)
     with quasardb.Cluster(**conn_kwargs) as conn:
         meta = _get_meta(conn, query, query_kwargs)
-        return _get_subqueries(conn, query, table_name), meta
+        return _split_query(conn, query, table_name), meta
 
 
 def query(
@@ -265,22 +279,22 @@ def query(
     }
 
     if rest_uri:
-        subqueries, meta = _get_tasks_from_rest_api(query, rest_uri)
+        split_queries, meta = get_tasks_from_rest_api(query, rest_uri)
     else:
         _ensure_python_api_imported()
-        subqueries, meta = _get_tasks_from_python_client(
+        split_queries, meta = get_tasks_from_python_api(
             query, conn_kwargs, query_kwargs
         )
 
-    if len(subqueries) == 0:
-        logging.warning("No subqueries, returning empty dataframe")
+    if len(split_queries) == 0:
+        logger.warning("No split queries, returning empty dataframe")
         return meta
 
     parts = []
-    for subquery in subqueries:
+    for split_query in split_queries:
         parts.append(
-            delayed(_read_dataframe)(subquery, meta, conn_kwargs, query_kwargs)
+            delayed(_read_dataframe)(split_query, meta, conn_kwargs, query_kwargs)
         )
-    logger.debug("Assembled %d subqueries", len(parts))
+    logger.debug("Assembled %d split queries", len(parts))
 
     return dd.from_delayed(parts, meta=meta)
