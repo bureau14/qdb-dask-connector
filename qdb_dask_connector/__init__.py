@@ -44,7 +44,7 @@ def _ensure_python_api_imported():
     If not, we raise an ImportError.
     """
 
-    if "quasardb" not in sys.modules or "qdbpd" not in sys.modules:
+    if "quasardb" not in sys.modules or "quasardb.pandas" not in sys.modules:
         raise QdbPythonApiRequired(
             "QuasarDB Python API is missing from your environment. "
             "QuasarDB dask integration can work with either REST API or Python API. "
