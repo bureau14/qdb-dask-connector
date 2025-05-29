@@ -1,0 +1,33 @@
+[project]
+requires-python = ">=3.9"
+name = "quasardb-dask"
+version = "0.1-dev"
+authors = [
+    {name = "quasardb SAS"},
+    {email="contact@quasardb.net" },
+]
+description = "Integration between QuasarDB's Python API and Dask DataFrame"
+dependencies = [
+    "dask[complete]",
+    "dateparser",
+    "pandas"
+]
+
+[project.optional-dependencies]
+python = ["quasardb"]
+
+[build-system]
+requires = ["setuptools", "build", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"quasardb_dask" = "qdb_dask_connector/"}
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.black]
+line-length = 88
+target-version = ['py39', 'py310', 'py311', 'py312', 'py313']
+include = '\.py?$'
+required-version = '24'

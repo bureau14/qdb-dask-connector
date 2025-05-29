@@ -1,0 +1,34 @@
+name: Lint
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - '**.py'
+  pull_request:
+    branches:
+      - master
+    paths:
+      - '**.py'
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Setup Python version
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: |
+          pip install -r scripts/github_actions/requirements.txt
+
+      - name: Run black
+        id: run_black
+        run: |
+          black --check --verbose .
