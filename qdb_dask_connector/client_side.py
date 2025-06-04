@@ -155,7 +155,7 @@ def _split_query(conn, query: str, table_name: str) -> list[str]:
     return split_queries
 
 
-def _get_meta(conn, query: str, query_kwargs: dict) -> pd.DataFrame:
+def get_meta(conn, query: str, query_kwargs: dict) -> pd.DataFrame:
     """
     Returns empty dataframe with the expected schema of the query result.
     """
@@ -171,7 +171,7 @@ def _get_meta(conn, query: str, query_kwargs: dict) -> pd.DataFrame:
 
 
 def get_tasks_from_rest_api(
-    query: str, rest_api_uri: str
+    query: str, rest_api_uri: str, query_args: dict
 ) -> tuple[list[str], pd.DataFrame]:
     """
     Connects to QuasarDB cluster using QuasarDB Rest API and:
@@ -203,7 +203,8 @@ def get_tasks_from_python_api(
 
     Requires up-to date QuasarDB Python API to be installed in the environment.
     """
+    ensure_python_api_imported()
     table_name = _extract_table_name_from_query(query)
     with quasardb.Cluster(**conn_kwargs) as conn:
-        meta = _get_meta(conn, query, query_kwargs)
+        meta = get_meta(conn, query, query_kwargs)
         return _split_query(conn, query, table_name), meta
