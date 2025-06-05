@@ -1,9 +1,7 @@
 import logging
 import pandas as pd
 import numpy as np
-from uuid import uuid4
 from dask.delayed import delayed
-import dask.dataframe as dd
 
 logger = logging.getLogger("quasardb_dask")
 
@@ -60,29 +58,45 @@ def _create_table_from_meta(conn, table_name: str, meta: pd.DataFrame):
     table.create(table_config)
 
 
-@delayed
-def writeback_query_to_cluster(
-    query: str, meta: pd.DataFrame, conn_kwargs: dict, query_kwargs: dict
-) -> str:
+def _writeback_query_to_cluster(
+    query: str,
+    table_name: str,
+    meta: pd.DataFrame,
+    conn_kwargs: dict,
+    query_kwargs: dict,
+):
     """
     Creates connection and queries cluster with passed query.
     Writes the result to a temporary table and returns a query to read from that table.
 
-    With complex interpolation queries spliting the query into multiple parts would result in loss of accuracy,
+    With complex interpolation queries splitting the query into multiple parts would result in loss of accuracy,
     so we write the result to a temporary table and return a simple `SELECT *` query, which can be easily split.
     """
     with quasardb.Cluster(**conn_kwargs) as conn:
         logger.debug('Querying QuasarDB with query: "%s"', query)
         df = qdbpd.query(conn, query, **query_kwargs)
-        df.set_index("$timestamp", inplace=True)
+        # we need some index to set $timestamp for new table
+        # if the query has an index use it, otherwise default to $timestamp
+        # this might create some issues, need to be tested
+        if query_kwargs["index"]:
+            df.set_index(query_kwargs["index"], inplace=True)
+        else:
+            df.set_index("$timestamp", inplace=True)
 
-        table_name = (
-            f"tmptable"  # TODO: $qdb prefix is reserved, add support for / in queries
-        )
         _create_table_from_meta(conn, table_name, meta)
 
         logger.debug("Writing dataframe to temporary table %s", table_name)
         qdbpd.write_dataframe(df, conn, table_name, fast=True)
 
-    writeback_query = f'SELECT * FROM "{table_name}"'
-    return writeback_query
+
+def prepare_persist_query(
+    query: str,
+    new_table_name: str,
+    meta: pd.DataFrame,
+    conn_kwargs: dict,
+    query_kwargs: dict,
+) -> str:
+    delayed(_writeback_query_to_cluster)(
+        query, new_table_name, meta, conn_kwargs, query_kwargs
+    ).compute()
+    return f'SELECT * FROM "{new_table_name}"'

@@ -53,7 +53,7 @@ def ensure_python_api_imported():
 
 # REGEX patterns used to parse the query
 general_select_pattern = re.compile(r"(?i)^\s*SELECT\b")
-table_pattern = re.compile(r"(?i)\bFROM\s+([`\"\[]?\w+[`\"\]]?)")
+table_pattern = re.compile(r"(?i)\bFROM\b\s+([^\s]+)")
 range_pattern = re.compile(r"(?i)\bIN\s+RANGE\s*\(([^,]+),\s*([^,]+)\)")
 
 
@@ -143,8 +143,9 @@ def _create_subrange_query(
     return new_query
 
 
-def _split_query(conn, query: str, table_name: str) -> list[str]:
+def split_query(conn, query: str) -> list[str]:
     # this function is used to mock part of future c api functionality
+    table_name = _extract_table_name_from_query(query)
     shard_size = conn.table(table_name.replace('"', "")).get_shard_size()
     start, end = _extract_range_from_query(conn, query, table_name)
     ranges_to_query = conn.split_query_range(start, end, shard_size)
@@ -204,7 +205,6 @@ def get_tasks_from_python_api(
     Requires up-to date QuasarDB Python API to be installed in the environment.
     """
     ensure_python_api_imported()
-    table_name = _extract_table_name_from_query(query)
     with quasardb.Cluster(**conn_kwargs) as conn:
         meta = get_meta(conn, query, query_kwargs)
-        return _split_query(conn, query, table_name), meta
+        return split_query(conn, query), meta
