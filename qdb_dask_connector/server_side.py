@@ -54,11 +54,11 @@ def _create_table_from_meta(conn, table_name: str, meta: pd.DataFrame):
 
     table = conn.table(table_name)
 
-    # TODO: we need some way to estimate shard size for this
+    # TODO: we might need some way to estimate shard size for this
     table.create(table_config)
 
 
-def _writeback_query_to_cluster(
+def read_write_back_query_to_cluster(
     query: str,
     table_name: str,
     meta: pd.DataFrame,
@@ -67,17 +67,14 @@ def _writeback_query_to_cluster(
 ):
     """
     Creates connection and queries cluster with passed query.
-    Writes the result to a temporary table and returns a query to read from that table.
-
-    With complex interpolation queries splitting the query into multiple parts would result in loss of accuracy,
-    so we write the result to a temporary table and return a simple `SELECT *` query, which can be easily split.
+    Writes the result to a temporary table.
     """
     with quasardb.Cluster(**conn_kwargs) as conn:
         logger.debug('Querying QuasarDB with query: "%s"', query)
         df = qdbpd.query(conn, query, **query_kwargs)
         # we need some index to set $timestamp for new table
         # if the query has an index use it, otherwise default to $timestamp
-        # this might create some issues, need to be tested
+        # this might create some issues, needs to be tested
         if query_kwargs["index"]:
             df.set_index(query_kwargs["index"], inplace=True)
         else:
@@ -96,7 +93,16 @@ def prepare_persist_query(
     conn_kwargs: dict,
     query_kwargs: dict,
 ) -> str:
-    delayed(_writeback_query_to_cluster)(
-        query, new_table_name, meta, conn_kwargs, query_kwargs
-    ).compute()
+    read_write_back_query_to_cluster(query, new_table_name, meta, conn_kwargs, query_kwargs)
     return f'SELECT * FROM "{new_table_name}"'
+
+
+def cleanup_persisted_table(
+    table_name: str, conn_kwargs: dict
+):
+    """
+    Cleans up the temporary table created for persisting the query.
+    """
+    with quasardb.Cluster(**conn_kwargs) as conn:
+        logger.debug("Dropping temporary table %s", table_name)
+        conn.table(table_name).remove()

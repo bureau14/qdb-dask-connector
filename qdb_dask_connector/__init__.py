@@ -33,8 +33,6 @@ def query(
     client_max_parallelism: int = 0,
     # query options
     index: str = None,  # XXX:igor this should be a union str | int, not possible with python<=3.9
-    # triggering persisting query
-    persist_mode: bool = False,
 ):
     _ensure_select_query(query)
 
@@ -59,13 +57,6 @@ def query(
             query, conn_kwargs, query_kwargs
         )
 
-    if persist_mode:
-        tmp_table_name = f"qdb/dask/{uuid4()}"
-        query = prepare_persist_query(
-            query, tmp_table_name, meta, conn_kwargs, query_kwargs
-        )
-        split_queries, _ = get_tasks_from_python_api(query, conn_kwargs, query_kwargs)
-
     if len(split_queries) == 0:
         logger.warning("No split queries, returning empty dataframe")
         return meta
@@ -80,3 +71,70 @@ def query(
     logger.debug("Assembled %d split queries", len(parts))
 
     return dd.from_delayed(parts, meta=meta)
+
+
+def _query_to_queries_from_temp_table(query: str, meta: pd.DataFrame, conn_kwargs: dict, query_kwargs: dict) -> list:
+    new_table_name = f"qdb/dask/{uuid4()}"  # $ prefix is reserved
+    read_write_back_query_to_cluster(query, new_table_name, meta, conn_kwargs, query_kwargs)
+    new_query = f'SELECT * FROM "{new_table_name}"'
+    with quasardb.Cluster(**conn_kwargs) as conn:
+        split_queries = split_query(conn, new_query)
+    
+    parts = []
+    for partial_query in split_queries:
+        parts.append(
+            delayed(read_dataframe)(
+                partial_query, meta, conn_kwargs, query_kwargs
+            ).persist()
+        )
+    logger.debug("Assembled %d split queries", len(parts))
+    return parts
+
+
+def query_persist(
+    query: str,
+    *,
+    cluster_uri: str,
+    # rest api options
+    rest_uri: str = "",
+    # python api options
+    user_name: str = "",
+    user_private_key: str = "",
+    cluster_public_key: str = "",
+    timeout: datetime.timedelta = datetime.timedelta(seconds=60),
+    enable_encryption: bool = False,
+    client_max_parallelism: int = 0,
+    # query options
+    index: str = None,  # XXX:igor this should be a union str | int, not possible with python<=3.9
+):
+    _ensure_select_query(query)
+
+    conn_kwargs = {
+        "uri": cluster_uri,
+        "user_name": user_name,
+        "user_private_key": user_private_key,
+        "cluster_public_key": cluster_public_key,
+        "timeout": timeout,
+        "enable_encryption": enable_encryption,
+        "client_max_parallelism": client_max_parallelism,
+    }
+
+    query_kwargs = {
+        "index": index,
+    }
+
+    if rest_uri:
+        _, meta = get_tasks_from_rest_api(query, rest_uri, query_kwargs)
+    else:
+        _, meta = get_tasks_from_python_api(
+            query, conn_kwargs, query_kwargs
+        )
+    
+    # up to this point its same as query()
+
+    splits = delayed(_query_to_queries_from_temp_table)(query, meta, conn_kwargs, query_kwargs)
+
+    # currently we run into type incompatibility:
+    # `splits` is a Delayed which, once called will return list[Delayed]
+    # dd.from_delayed expects list[Delayed]
+    return dd.from_delayed(splits, meta)
