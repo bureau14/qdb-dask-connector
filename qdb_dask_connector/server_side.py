@@ -93,13 +93,13 @@ def prepare_persist_query(
     conn_kwargs: dict,
     query_kwargs: dict,
 ) -> str:
-    read_write_back_query_to_cluster(query, new_table_name, meta, conn_kwargs, query_kwargs)
+    read_write_back_query_to_cluster(
+        query, new_table_name, meta, conn_kwargs, query_kwargs
+    )
     return f'SELECT * FROM "{new_table_name}"'
 
 
-def cleanup_persisted_table(
-    table_name: str, conn_kwargs: dict
-):
+def cleanup_persisted_table(table_name: str, conn_kwargs: dict):
     """
     Cleans up the temporary table created for persisting the query.
     """

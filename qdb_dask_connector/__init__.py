@@ -73,13 +73,17 @@ def query(
     return dd.from_delayed(parts, meta=meta)
 
 
-def _query_to_queries_from_temp_table(query: str, meta: pd.DataFrame, conn_kwargs: dict, query_kwargs: dict) -> list:
+def _query_to_queries_from_temp_table(
+    query: str, meta: pd.DataFrame, conn_kwargs: dict, query_kwargs: dict
+) -> list:
     new_table_name = f"qdb/dask/{uuid4()}"  # $ prefix is reserved
-    read_write_back_query_to_cluster(query, new_table_name, meta, conn_kwargs, query_kwargs)
+    read_write_back_query_to_cluster(
+        query, new_table_name, meta, conn_kwargs, query_kwargs
+    )
     new_query = f'SELECT * FROM "{new_table_name}"'
     with quasardb.Cluster(**conn_kwargs) as conn:
         split_queries = split_query(conn, new_query)
-    
+
     parts = []
     for partial_query in split_queries:
         parts.append(
@@ -126,15 +130,15 @@ def query_persist(
     if rest_uri:
         _, meta = get_tasks_from_rest_api(query, rest_uri, query_kwargs)
     else:
-        _, meta = get_tasks_from_python_api(
-            query, conn_kwargs, query_kwargs
-        )
-    
+        _, meta = get_tasks_from_python_api(query, conn_kwargs, query_kwargs)
+
     # up to this point its same as query()
 
-    splits = delayed(_query_to_queries_from_temp_table)(query, meta, conn_kwargs, query_kwargs)
+    splits = delayed(_query_to_queries_from_temp_table)(
+        query, meta, conn_kwargs, query_kwargs
+    )
 
     # currently we run into type incompatibility:
-    # `splits` is a Delayed which, once called will return list[Delayed]
-    # dd.from_delayed expects list[Delayed]
+    # `splits` is a Delayed which, once computed will return list[Delayed]
+    # dd.from_delayed expects list[Delayed], it gets Delayed[list[Delayed]]
     return dd.from_delayed(splits, meta)
