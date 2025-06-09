@@ -184,5 +184,15 @@ secure/
 user_private.key
 users.cfg
 
+*.bak
+
 # local log files
 qdbd*log*
+
+# START Ruler Generated Files
+.aider.conf.yml
+AGENTS.md
+ruler_aider_instructions.md
+# END Ruler Generated Files
+
+.aider*
