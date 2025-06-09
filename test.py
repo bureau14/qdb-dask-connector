@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.DEBUG)
 def example():
     # create a lazy task
     df = query_persist(
-        'SELECT * FROM "dask_test"',
+        'SELECT * FROM "process_data/9443"',
         cluster_uri="qdb://127.0.0.1:2836",
     )
     # compute into dataframe
