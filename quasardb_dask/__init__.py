@@ -95,7 +95,8 @@ def _query_to_queries_from_temp_table(
     return parts
 
 
-def query_persist(
+### TODO(leon): decide proper name
+def query2(
     query: str,
     *,
     cluster_uri: str,
@@ -111,6 +112,10 @@ def query_persist(
     # query options
     index: str = None,  # XXX:igor this should be a union str | int, not possible with python<=3.9
 ):
+    """
+    Supports complex queries which cannot be trivially partitioned into smaller slices.
+    """
+
     _ensure_select_query(query)
 
     conn_kwargs = {
