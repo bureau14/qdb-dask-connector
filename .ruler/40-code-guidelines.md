@@ -23,6 +23,11 @@ When documenting functions:
 
      xs : List[int | str]
        The list to process
+
+     Raises
+     ------
+     ValueError
+        If *xs* contains dask deferred or other kind of future.
      """
      return xs[0]
   ```
