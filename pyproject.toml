@@ -12,6 +12,7 @@ dependencies = [
     "dateparser",
     "pandas",
     "svix-ksuid",
+    "pendulum",
 ]
 
 [project.optional-dependencies]
