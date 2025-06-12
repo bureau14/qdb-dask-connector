@@ -2,69 +2,6 @@ import logging
 import pandas as pd
 import numpy as np
 import math
-
-
-def _log_df_schema(df: pd.DataFrame, label: str) -> None:
-    """
-    Debug helper: dumps a compact schema overview of *df*.
-
-    Example output
-    --------------
-    task-result: shape=(0, 3) columns=['$timestamp', 'x', 'y']
-                 dtypes={'$timestamp': dtype('<M8[ns]'), 'x': dtype('float64'), …}
-    """
-    logger.debug(
-        "%s: shape=%s  " "index[name=%s, dtype=%s]  " "columns=%s  " "dtypes=%s",
-        label,
-        df.shape,
-        df.index.name,
-        df.index.dtype,
-        list(df.columns),
-        {k: str(v) for k, v in df.dtypes.items()},
-    )
-
-
-def _assert_frame_matches_meta(df: pd.DataFrame, meta: pd.DataFrame) -> None:
-    # ----- column checks -------------------------------------------------
-    missing = set(meta.columns) - set(df.columns)
-    extra = set(df.columns) - set(meta.columns)
-
-    # if `$timestamp` moved from column → index, do not treat as error
-    if (
-        "$timestamp" in missing
-        and meta.index.name == "$timestamp"
-        and df.index.name == "$timestamp"
-    ):
-        missing.discard("$timestamp")
-
-    mismatched = {
-        c: (df[c].dtype, meta[c].dtype)
-        for c in meta.columns.intersection(df.columns)
-        if df[c].dtype != meta[c].dtype
-    }
-
-    # ----- index checks --------------------------------------------------
-    index_mismatch = (
-        df.index.name != meta.index.name or df.index.dtype != meta.index.dtype
-    )
-
-    if missing or extra or mismatched or index_mismatch:
-        logger.error(
-            "Metadata mismatch detected.\n"
-            "  missing columns : %s\n"
-            "  extra columns   : %s\n"
-            "  dtype mismatch  : %s\n"
-            "  index mismatch  : %s (df=%s, meta=%s)",
-            missing,
-            extra,
-            mismatched,
-            index_mismatch,
-            (df.index.name, df.index.dtype),
-            (meta.index.name, meta.index.dtype),
-        )
-        raise ValueError("run_partition_task: dataframe schema differs from *meta*")
-
-
 import pendulum  # easy date/time interaction
 from ksuid import Ksuid  # k-sortable identifiers for temporary tables
 
@@ -210,12 +147,6 @@ def run_partition_task(
         return meta
 
     _restore_empty_float_columns(df, meta)
-
-    # --- new debug / early-fail block ----------------------------------
-    _log_df_schema(df, "task-result")
-    _log_df_schema(meta, "meta-template")
-    _assert_frame_matches_meta(df, meta)
-    # -------------------------------------------------------------------
 
     return df
 
