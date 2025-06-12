@@ -1,6 +1,6 @@
 ## Python guidelines
 
-* Version: ≥3.10
+* Version: ≥3.11
 * Use strictly idiomatic, performance-oriented solutions with the standard library.
 * Recommend third-party packages only when they provide documented, measurable advantages.
 * Treat new language features as fully supported; e.g.:
@@ -15,3 +15,4 @@
     ```
   * assignment expressions:
     `if (n := len(a)) > 10`
+* Use python types only for function declarations, not in code blocks
