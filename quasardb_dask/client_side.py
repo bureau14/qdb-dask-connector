@@ -138,7 +138,6 @@ def query(
         # the list as a whole, meaning there are no large dataframes being
         # cached and the total dataset size can exceed memory.
         logger.info("Using distributed scheduler, persisting individual parts")
-        # persisted_parts = df_partitions
         persisted_parts = client.persist(df_partitions, optimize_graph=True)
 
     # ------------------------------------------------------------------
