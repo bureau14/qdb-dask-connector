@@ -9,6 +9,7 @@ NOTES:
 import pandas as pd
 import quasardb
 import quasardb_dask as qdbdask
+from dask.distributed import Client
 from dask.distributed import LocalCluster, Client
 
 QDB_URI = "qdb://127.0.0.1:2836"
@@ -54,7 +55,7 @@ def get_quasardb_data(
 def get_run_status_data(tag):
     return get_quasardb_data(
         tag,
-        ["$timestamp as run_time", "numericvalue as run_value"],
+        ["$timestamp", "numericvalue as run_value"],
         DATA_START_DATE,
         DATA_END_DATE,
         DATA_STEP,
@@ -220,9 +221,7 @@ def get_run_status_df(run_status_tag):
     df = get_run_status_data(run_status_tag)
 
     # 2. Cast the values properly (float -> int)
-    df["run_value"] = df["run_value"].apply(
-        lambda x: 0 if x < 0.5 else 1, meta=("run_value", "int64")
-    )
+    df["run_value"] = df["run_value"].apply(lambda x: 0 if x < 0.5 else 1)
 
     # 3. Calculate the group id / rank / count
     df["grp"] = ((df["run_value"] != 1) | (df["run_value"].shift() != 1)).cumsum()
@@ -243,7 +242,7 @@ def get_run_status_df(run_status_tag):
     df["run_value"] = df["run_value"].where(mask, 0)
 
     # 5. Return the proper columns
-    df = df[["run_time", "run_value"]]
+    df = df[["run_value"]]
 
     return df
 
@@ -257,7 +256,7 @@ def get_process_df(process_tag, grade_tag=None, run_tag=None):
     df = get_good_data(process_tag, get_known_bad_values(), "process_value")
 
     # 2. Merge both process and grade dataframes
-    columns = ["$timestamp", "process_value"]
+    columns = ["process_value"]
     if grade_tag:
         grade_df = get_good_data(
             grade_tag, get_known_bad_values(), "grade_value", False, "constant"
@@ -281,24 +280,22 @@ def get_clean_process_df(process_df):
     Get clean data based on thresholds.
     """
 
-    # 1. Row-count: one light-weight shuffle across workers.
-    n_rows = process_df.map_partitions(len).sum().compute()
+    # 1. Get % of training minutes
+    process_df = process_df.persist()  # needed for `len` and bounds
+    if len(process_df) / DATA_N_TRAINING_MINUTES < 0.8:
+        print("The number of minutes is less than the threshold. Exiting")
+        return None
 
-    # 2. Get % of training minutes
-    # if n_rows / DATA_N_TRAINING_MINUTES < 0.8:
-    # print("The number of minutes is less than the threshold. Exiting")
-    # return None
-
-    # 3. Get Quantiles
+    # 2. Get Quantiles
     Q1 = process_df["process_value"].quantile(0.25)
     Q3 = process_df["process_value"].quantile(0.75)
     IQR = Q3 - Q1
 
-    # 4. Get lower/upper bounds
+    # 3. Get lower/upper bounds
     lower_bound = Q1 - 1.5 * IQR
     upper_bound = Q3 + 1.5 * IQR
 
-    # 5. Get clean data
+    # 4. Get clean data
     df = process_df[
         (process_df["process_value"] >= lower_bound)
         & (process_df["process_value"] <= upper_bound)
@@ -346,40 +343,3 @@ if __name__ == "__main__":
     with LocalCluster(n_workers=2) as cluster:
         with Client(cluster) as client:
             main()
-    # with LocalCluster(n_workers=4, threads_per_worker=1, processes=False) as cluster:
-#     with Client("tcp://10.227.239.27:8786") as client:
-#         main()
-
-
-# ### this file is added for convinience and it shouldn't be included in PR!
-
-# from dask.distributed import LocalCluster, Client
-
-# from quasardb_dask import *
-# import logging
-
-# logging.basicConfig(level=logging.DEBUG)
-
-
-# def example():
-#     # create a lazy task
-#     df = query(
-#         'SELECT * FROM "process_data/9443" IN RANGE (2025-01-01, 2025-04-01)',
-#         cluster_uri="qdb://127.0.0.1:2836",
-#     )
-#     # compute into dataframe
-#     df = df.compute()
-#     # print standard pandas dataframe
-#     print(df.head())
-
-
-# if __name__ == "__main__":
-
-#     # this is a super simple example that validates that your function works
-#     # example()
-
-#     # if you want to see how dask distribiutes this on a cluster use this code
-
-#     with LocalCluster(n_workers=2) as cluster:
-#         with Client(cluster) as client:
-#             example()
