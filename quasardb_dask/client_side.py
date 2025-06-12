@@ -45,8 +45,6 @@ def query(
     timeout: datetime.timedelta = datetime.timedelta(seconds=60),
     enable_encryption: bool = False,
     client_max_parallelism: int = 0,
-    # query options
-    index: str | int = None,
     # temporary hack until we get the `qdb_query_validate` function implemented,
     # this allows the user to specify the actual metadata dataframe so that we don't
     # have to run the entire query to figure out what the type of the result will be.
@@ -64,9 +62,8 @@ def query(
         "client_max_parallelism": client_max_parallelism,
     }
 
-    query_kwargs = {
-        "index": index,
-    }
+    # Hard-code the canonical index for every query.
+    query_kwargs: dict[str, str] = {"index": "$timestamp"}
 
     ##
     # Coding style for this function:
@@ -87,12 +84,15 @@ def query(
 
     # But we immediately compute it -- it's very cheap to do, and in the
     # call to `dd.from_delayed`, `meta` is not allowed to be a delayed.
-    meta = meta_dly.compute()
+    if meta is None:
+        meta = meta_dly.compute()
+
+    logger.info("using meta: %s", meta.dtypes)
 
     # ------------------------------------------------------------------
-    # 1. Take a single large query and split it into smaller queries
+    # 1. Take a single large query and split it into smaller tasks
     # ------------------------------------------------------------------
-    queries_dly = delayed(materialize_to_temp)(query, meta, conn_kwargs, query_kwargs)
+    tasks_dly = delayed(split_query)(query, meta, conn_kwargs, query_kwargs)
 
     # ------------------------------------------------------------------
     # 2. Build the delayed read partitions (one per split)
@@ -106,9 +106,11 @@ def query(
     # Returns an array of delayeds
     def _build_df_partitions(xs):
         # Executed on worker
-        return [delayed(read_dataframe)(x, meta, conn_kwargs, query_kwargs) for x in xs]
+        return [
+            delayed(run_partition_task)(x, meta, conn_kwargs, query_kwargs) for x in xs
+        ]
 
-    df_partitions_dly = delayed(_build_df_partitions)(queries_dly)
+    df_partitions_dly = delayed(_build_df_partitions)(tasks_dly)
 
     # But now we need to "unwrap" the result itself, do that it goes from
     #
@@ -136,8 +138,8 @@ def query(
         # the list as a whole, meaning there are no large dataframes being
         # cached and the total dataset size can exceed memory.
         logger.info("Using distributed scheduler, persisting individual parts")
-        persisted_parts = df_partitions
-        # persisted_parts = client.persist(df_partitions, optimize_graph=True)
+        # persisted_parts = df_partitions
+        persisted_parts = client.persist(df_partitions, optimize_graph=True)
 
     # ------------------------------------------------------------------
     # 3. Wrap them in a Dask-dataframe shell
