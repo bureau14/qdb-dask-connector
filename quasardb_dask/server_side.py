@@ -14,6 +14,26 @@ except ImportError as err:
     pass
 
 
+def _empty_like(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Return an *empty* DataFrame that preserves
+    • column order,
+    • dtypes,
+    • index name and dtype.
+
+    Works even when *df* itself is all-NA.
+    """
+    # 1. one empty Series per column, dtype taken verbatim
+    cols = {c: pd.Series(dtype=df.dtypes[c]) for c in df.columns}
+
+    # 2. Create a np.datetime64 index spec -- for now we only support
+    #    dataframes with a $timestamp np.datetime64[ns] index.
+    idx = pd.Index([], name="$timestamp", dtype=np.dtype("datetime64[ns]"))
+
+    # 3. Create a new, empty dataframe
+    return pd.DataFrame(cols, index=idx)
+
+
 def _restore_empty_float_columns(df: pd.DataFrame, meta: pd.DataFrame) -> None:
     """
     Down-cast columns that Pandas temporarily promoted to ``float64`` solely
@@ -87,10 +107,6 @@ def _coerce_timestamp_index(df: pd.DataFrame, name: str = "$timestamp") -> None:
     # 2. Enforce index name ----------------------------------------
     df.index.name = name
 
-    # # 3. Duplicate as column for legacy code -----------------------
-    # if name not in df.columns:
-    #     df[name] = df.index
-
 
 def create_partition_tasks(
     query: str,
@@ -162,6 +178,25 @@ def create_partition_tasks(
 
     # TODO: implement
     return tasks
+
+
+def get_meta(query: str, conn_kwargs: dict, query_kwargs: dict) -> pd.DataFrame:
+    """
+    Returns empty dataframe with the expected schema of the query result.
+    """
+
+    ## TODO: fix
+    #
+    # Waiting for real function to be implemented
+
+    ##
+    # Hard-coded to execute the *actual* query right now, drop all the data
+    # and just return the schema.
+    #
+    # This is an uber-hack, should be removed
+    with quasardb.Cluster(**conn_kwargs) as conn:
+        df = qdbpd.query(conn, query, **query_kwargs)
+        return _empty_like(df)
 
 
 def run_partition_task(
@@ -488,42 +523,3 @@ def materialize_to_temp(
             )
             for rng in ranges
         ]
-
-
-def _empty_like(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Return an *empty* DataFrame that preserves
-    • column order,
-    • dtypes,
-    • index name and dtype.
-
-    Works even when *df* itself is all-NA.
-    """
-    # 1. one empty Series per column, dtype taken verbatim
-    cols = {c: pd.Series(dtype=df.dtypes[c]) for c in df.columns}
-
-    # 2. Create a np.datetime64 index spec -- for now we only support
-    #    dataframes with a $timestamp np.datetime64[ns] index.
-    idx = pd.Index([], name="$timestamp", dtype=np.dtype("datetime64[ns]"))
-
-    # 3. Create a new, empty dataframe
-    return pd.DataFrame(cols, index=idx)
-
-
-def get_meta(query: str, conn_kwargs: dict, query_kwargs: dict) -> pd.DataFrame:
-    """
-    Returns empty dataframe with the expected schema of the query result.
-    """
-
-    ## TODO: fix
-    #
-    # Waiting for real function to be implemented
-
-    ##
-    # Hard-coded to execute the *actual* query right now, drop all the data
-    # and just return the schema.
-    #
-    # This is an uber-hack, should be removed
-    with quasardb.Cluster(**conn_kwargs) as conn:
-        df = qdbpd.query(conn, query, **query_kwargs)
-        return _empty_like(df)
