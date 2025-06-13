@@ -93,7 +93,7 @@ def query(
     # ------------------------------------------------------------------
     # 1. Take a single large query and split it into smaller tasks
     # ------------------------------------------------------------------
-    tasks_dly = delayed(split_query)(
+    tasks_dly = delayed(create_partition_tasks)(
         query, meta, conn_kwargs, query_kwargs, npartitions=npartitions
     )
 

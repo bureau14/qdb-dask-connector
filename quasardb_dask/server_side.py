@@ -16,15 +16,27 @@ except ImportError as err:
 
 def _restore_empty_float_columns(df: pd.DataFrame, meta: pd.DataFrame) -> None:
     """
-    Fix dtype mismatches caused by pandas’ default behaviour when a column has no
-    data for the current split:
+    Down-cast columns that Pandas temporarily promoted to ``float64`` solely
+    because the *current partition* consists of all-NaN values.
 
-    • If a Series is promoted to float64 *only* because it contains only NaN
-      values, cast it back to the dtype found in *meta* so that downstream
-      dtypes stay consistent.
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Frame to fix (mutated **in-place**).
+    meta : pandas.DataFrame
+        Authoritative schema whose dtypes must be preserved.
 
-    The function mutates *df* in-place and silently ignores columns that do not
-    satisfy the three bullet-point criteria above.
+    Decision rationale:
+    • Guarantees dtype stability across partitions so that later concatenation
+      or group-by steps do not raise “dtype mismatch” errors.
+
+    Key assumptions:
+    • A column is safe to cast back when **all** its values are ``NaN``.
+    • *meta* contains the desired dtype for every column present in *df*.
+
+    Performance trade-offs:
+    • Operates column-wise with vectorised checks; overhead is negligible
+      compared with network I/O.
     """
     for col in df.columns.intersection(meta.columns):
         if (
@@ -39,9 +51,27 @@ def _restore_empty_float_columns(df: pd.DataFrame, meta: pd.DataFrame) -> None:
 
 def _coerce_timestamp_index(df: pd.DataFrame, name: str = "$timestamp") -> None:
     """
-    Ensure the index is a DatetimeIndex named ``$timestamp`` and
-    also expose it as a column of the same name.
-    Mutates *df* in-place.
+    Normalise *df* so its index is a ``DatetimeIndex[ns]`` named ``$timestamp``
+    and expose the same data as a column of that name when absent.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Frame to normalise (mutated **in-place**).
+    name : str, default ``"$timestamp"``
+        Desired index / column label.
+
+    Decision rationale:
+    • QuasarDB treats ``$timestamp`` as the canonical time axis; normalising
+      early prevents subtle alignment bugs during Dask shuffles and merges.
+
+    Key assumptions:
+    • Either the current index or the column *name* can be coerced to
+      ``datetime64[ns]``.
+
+    Performance trade-offs:
+    • Uses cheap dtype checks and vectorised ``pd.to_datetime``; the cost is
+      dominated by upstream network latency.
     """
     # 1. Normalise to DatetimeIndex[ns] -----------------------------
     if df.index.dtype != np.dtype("datetime64[ns]"):
@@ -62,43 +92,60 @@ def _coerce_timestamp_index(df: pd.DataFrame, name: str = "$timestamp") -> None:
     #     df[name] = df.index
 
 
-def split_query(
+def create_partition_tasks(
     query: str,
     meta: pd.DataFrame,
     conn_kwargs: dict,
     query_kwargs: dict,
     npartitions: int,
-) -> list[str]:
+) -> list[tuple[str, str] | tuple[str, dict]]:
     """
-    Attempts to decompose *query* into a set of non-overlapping smaller queries
-    that can be executed independently.
+    Decompose *query* into smaller, independent tasks that can be executed as
+    separate Dask partitions.
 
-    If this fails (e.g. the query uses window functions, contains an ASOF JOIN,
-    or any other construct we can’t analyse yet), we return the original
-    query as a single‐element list; the caller will then fall back to
-    `materialize_to_temp`, which handles non-splittable workloads.
+    Parameters
+    ----------
+    query : str
+        User-supplied SELECT statement.
+    meta : pandas.DataFrame
+        Empty frame describing the expected schema.
+    conn_kwargs, query_kwargs : dict
+        Forwarded to the QuasarDB Python API.
+    npartitions : int
+        Desired number of partitions (≥ 1).
 
     Returns
     -------
-    list[str]
-        Either the list of split queries or ``[query]`` when splitting is
-        impossible.
+    list[tuple[str, str] | tuple[str, dict]]
+        Each element is either
+        • ("query",   <sql>)   – run `<sql>` directly, or
+        • ("reader",  <dict>) – call ``qdbpd.read_dataframe`` with *dict*.
+
+    Decision rationale:
+    • Enables parallel execution by turning one large query into many smaller,
+      non-overlapping jobs.
+    • Falls back to materialising the result into a temporary table when the
+      query cannot be split safely (ASOF JOIN, window functions, …).
+
+    Performance trade-offs:
+    • Splitting avoids repeated large transfers; materialisation trades a single
+      write & short-lived storage for simplified downstream reads.
     """
 
     if npartitions == 1:
-        # Don't even bother spitting the query, just return the query as-is.
-        logger.info("single partition input query, avoiding split")
+        # Don't even bother creating multiple partition tasks, just return the query as-is.
+        logger.info("single partition input query, avoiding partitioning")
         return [("query", query)]
 
     ##
-    # TODO: use QuasarDB Python API to parse the query and split it into multiple
-    #       smaller parts. Needs implementation in QuasarDB C API.
+    # TODO: use QuasarDB Python API to parse the query and create multiple
+    #       partition tasks. Needs implementation in QuasarDB C API.
     #
     #       See shortcut ticket: sc-16768/add-function-that-splits-query-to-the-c-api
 
     tasks = [("query", query)]
 
-    # If only 1 split was made by the C API, it means the query is not splittable (e.g.
+    # If only 1 partition task was made by the C API, it means the query is not splittable (e.g.
     # an ASOF JOIN, window function, etc).
     #
     # In this case, we "materialize" the query's result into a temporary table.
@@ -111,7 +158,7 @@ def split_query(
             query, meta, conn_kwargs, query_kwargs, npartitions=npartitions
         )
 
-    logger.debug("split input query into %d smaller tasks", len(tasks))
+    logger.debug("created %d partition tasks from input query", len(tasks))
 
     # TODO: implement
     return tasks
