@@ -1,11 +1,6 @@
-import re
-import logging
-import datetime
-import dask.dataframe as dd
-from dask.delayed import delayed
-from dask.distributed import get_client, wait
-from uuid import uuid4
+import dask
 
-logger = logging.getLogger("quasardb_dask")
+# Avoids a lot of common pitfalls with unaligned datasets
+dask.config.set({"dataframe.shuffle.method": "tasks"})
 
 from .client_side import *
