@@ -63,7 +63,11 @@ def _coerce_timestamp_index(df: pd.DataFrame, name: str = "$timestamp") -> None:
 
 
 def split_query(
-    query: str, meta: pd.DataFrame, conn_kwargs: dict, query_kwargs: dict
+    query: str,
+    meta: pd.DataFrame,
+    conn_kwargs: dict,
+    query_kwargs: dict,
+    npartitions: int,
 ) -> list[str]:
     """
     Attempts to decompose *query* into a set of non-overlapping smaller queries
@@ -80,6 +84,11 @@ def split_query(
         Either the list of split queries or ``[query]`` when splitting is
         impossible.
     """
+
+    if npartitions == 1:
+        # Don't even bother spitting the query, just return the query as-is.
+        logger.info("single partition input query, avoiding split")
+        return [("query", query)]
 
     ##
     # TODO: use QuasarDB Python API to parse the query and split it into multiple
@@ -98,7 +107,9 @@ def split_query(
         task_type, query = tasks[0]
         assert task_type == "query"
 
-        tasks = materialize_to_temp(query, meta, conn_kwargs, query_kwargs)
+        tasks = materialize_to_temp(
+            query, meta, conn_kwargs, query_kwargs, npartitions=npartitions
+        )
 
     logger.debug("split input query into %d smaller tasks", len(tasks))
 
@@ -250,17 +261,17 @@ def _create_table_from_meta(
 def _df_to_ranges(
     df: pd.DataFrame,
     *,
-    nranges: int,
+    npartitions: int,
 ) -> list[tuple[np.datetime64, np.datetime64]]:
     """
-    Split a DataFrame’s DatetimeIndex into *nranges* consecutive,
+    Split a DataFrame’s DatetimeIndex into *npartitions* consecutive,
     non-overlapping, half-open intervals.
 
     Parameters
     ----------
     df : pandas.DataFrame
         Non-empty frame whose index is ``DatetimeIndex[ns]``.
-    nranges : int
+    npartitions : int
         Number of desired splits (≥ 1).
 
     Returns
@@ -273,7 +284,7 @@ def _df_to_ranges(
     ------
     AssertionError
         If *df* is empty or its index is not ``datetime64[ns]``.
-        If *nranges* is ``None`` or < 1.
+        If *npartitions* is ``None`` or < 2.
 
     Decision rationale:
     • Keeps implementation simple and predictable; no shard alignment here.
@@ -286,23 +297,19 @@ def _df_to_ranges(
     assert df.index.dtype == np.dtype("datetime64[ns]"), (
         "_df_to_ranges: index must be datetime64[ns], " f"got {df.index.dtype}"
     )
-    assert nranges is not None, "_df_to_ranges: nranges must be an int ≥ 1"
-    assert nranges >= 1, "_df_to_ranges: nranges must be ≥ 1"
+    assert npartitions is not None, "_df_to_ranges: npartitions must be an int > 1"
+    assert npartitions > 1, "_df_to_ranges: npartitions must be > 1"
 
     first = pd.Timestamp(df.index.min())
     last_exclusive = pd.Timestamp(df.index.max()) + pd.Timedelta("1ns")
 
-    # single split --------------------------------------------------
-    if nranges <= 1:
-        return [(first.to_datetime64(), last_exclusive.to_datetime64())]
-
-    # We create an **evenly-spaced grid** of nranges + 1 timestamps that
+    # We create an **evenly-spaced grid** of npartitions + 1 timestamps that
     # spans the whole interval `[first, last_exclusive)`.
     #   boundaries[0]           == first
     #   boundaries[-1]          == last_exclusive
-    # Consecutive pairs of these timestamps form the `nranges` *half-open*
+    # Consecutive pairs of these timestamps form the `npartitions` *half-open*
     # intervals we want:  [s, e) with `s` included and `e` excluded.
-    boundaries = pd.date_range(start=first, end=last_exclusive, periods=nranges + 1)
+    boundaries = pd.date_range(start=first, end=last_exclusive, periods=npartitions + 1)
     # Convert every `[start, end)` pair to a tuple of numpy.datetime64[ns]
     # values – this keeps the downstream serialisation compact and avoids
     # dtype surprises when the ranges are fed into the QuasarDB reader.
@@ -317,6 +324,7 @@ def materialize_to_temp(
     meta: pd.DataFrame,
     conn_kwargs: dict,
     query_kwargs: dict,
+    npartitions: int,
 ) -> list[tuple]:
     """
     Materialises *query* into a fresh temporary QuasarDB table and returns a
@@ -329,6 +337,8 @@ def materialize_to_temp(
     meta : pandas.DataFrame
         Empty DataFrame describing the expected schema; reused for table
         creation and column projection.
+    npartitions : int
+        Number of distinct partitions to return
     conn_kwargs : dict
         Arguments forwarded to ``quasardb.Cluster``.
     query_kwargs : dict
@@ -406,7 +416,7 @@ def materialize_to_temp(
         #
         # Start by building (start, end) ranges for the reader task.
         # derive a split count that roughly follows shard_size semantics
-        ranges = _df_to_ranges(df, nranges=1)
+        ranges = _df_to_ranges(df, npartitions=npartitions)
 
         # ------------------------------------------------------------------
         # Select only the *user-visible* columns.
@@ -433,12 +443,30 @@ def materialize_to_temp(
         ]
 
 
+def _empty_like(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Return an *empty* DataFrame that preserves
+    • column order,
+    • dtypes,
+    • index name and dtype.
+
+    Works even when *df* itself is all-NA.
+    """
+    # 1. one empty Series per column, dtype taken verbatim
+    cols = {c: pd.Series(dtype=df.dtypes[c]) for c in df.columns}
+
+    # 2. Create a np.datetime64 index spec -- for now we only support
+    #    dataframes with a $timestamp np.datetime64[ns] index.
+    idx = pd.Index([], name="$timestamp", dtype=np.dtype("datetime64[ns]"))
+
+    # 3. Create a new, empty dataframe
+    return pd.DataFrame(cols, index=idx)
+
+
 def get_meta(query: str, conn_kwargs: dict, query_kwargs: dict) -> pd.DataFrame:
     """
     Returns empty dataframe with the expected schema of the query result.
     """
-    local_qkwargs = query_kwargs.copy()
-    local_qkwargs.setdefault("index", "$timestamp")
 
     ## TODO: fix
     #
@@ -450,8 +478,5 @@ def get_meta(query: str, conn_kwargs: dict, query_kwargs: dict) -> pd.DataFrame:
     #
     # This is an uber-hack, should be removed
     with quasardb.Cluster(**conn_kwargs) as conn:
-        df = qdbpd.query(conn, query, **local_qkwargs)
-
-        _coerce_timestamp_index(df)
-
-        return df[0:0]
+        df = qdbpd.query(conn, query, **query_kwargs)
+        return _empty_like(df)

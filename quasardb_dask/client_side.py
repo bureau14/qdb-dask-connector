@@ -49,6 +49,7 @@ def query(
     # this allows the user to specify the actual metadata dataframe so that we don't
     # have to run the entire query to figure out what the type of the result will be.
     meta: pd.DataFrame = None,
+    npartitions: int = 1,  # The number of dask partitions to return, which enables parallelization of input queries
 ):
     _ensure_select_query(query)
 
@@ -92,7 +93,9 @@ def query(
     # ------------------------------------------------------------------
     # 1. Take a single large query and split it into smaller tasks
     # ------------------------------------------------------------------
-    tasks_dly = delayed(split_query)(query, meta, conn_kwargs, query_kwargs)
+    tasks_dly = delayed(split_query)(
+        query, meta, conn_kwargs, query_kwargs, npartitions=npartitions
+    )
 
     # ------------------------------------------------------------------
     # 2. Build the delayed read partitions (one per split)
