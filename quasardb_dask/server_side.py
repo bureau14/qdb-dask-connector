@@ -549,5 +549,10 @@ def write_df(
     """
     with quasardb.Cluster(**conn_kwargs) as conn:
         qdbpd.write_dataframe(
-            df, conn, table=table_name, create=create, shard_size=shard_size
+            df,
+            conn,
+            table=table_name,
+            create=create,
+            shard_size=shard_size,
+            push_mode=quasardb.WriterPushMode.Fast,
         )

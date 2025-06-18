@@ -169,10 +169,11 @@ def write_dataframe(
     """
     Writes DataFrame to a QuasarDB table.
 
-    Takes either a Dask DataFrame or a Pandas DataFrame and writes it to the specified QuasarDB table.
+    Accepts either a Dask DataFrame or a Pandas DataFrame and writes it to the specified QuasarDB table.
 
     Returns a delayed object that can be computed to perform the write operation.
     """
+
     conn_kwargs = {
         "uri": cluster_uri,
         "user_name": user_name,
