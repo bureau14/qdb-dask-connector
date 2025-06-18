@@ -196,3 +196,6 @@ ruler_aider_instructions.md
 # END Ruler Generated Files
 
 .aider*
+
+
+.vscode/*
