@@ -36,8 +36,6 @@ def query(
     query: str,
     *,
     cluster_uri: str,
-    # rest api options
-    rest_uri: str = "",
     # python api options
     user_name: str = "",
     user_private_key: str = "",
