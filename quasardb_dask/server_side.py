@@ -337,7 +337,7 @@ def _create_table_from_meta(
 
     table = conn.table(table_name)
 
-    table.create(table_config, shard_size=shard_size)
+    table.create(table_config, shard_size=shard_size, ttl=ttl)
 
 
 def _df_to_ranges(
