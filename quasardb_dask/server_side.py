@@ -547,11 +547,19 @@ def write_df(
     create : bool, default True
     shard_size : pendulum.Duration, default 1 day
     """
+    # make sure the DataFrame has correct index
+    _coerce_timestamp_index(df)
+    # drop internal columns
+    df.drop(
+        columns=[c for c in df.columns if c.startswith("$")],
+        inplace=True,
+    )
+
     with quasardb.Cluster(**conn_kwargs) as conn:
         qdbpd.write_dataframe(
             df,
             conn,
-            table=table_name,
+            table_name,
             create=create,
             shard_size=shard_size,
             push_mode=quasardb.WriterPushMode.Fast,
