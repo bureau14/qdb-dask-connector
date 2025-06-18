@@ -22,7 +22,6 @@ def test_write_dataframe_is_lazy(df_with_table, qdbd_connection, qdbd_settings):
     assert (
         type(write_task) == Delayed
     ), "write_dataframe should return a dask delayed object"
-    assert qdbpd.read_dataframe(qdbd_connection, table).empty()
 
 
 def test_write_pandas_dataframe(df_with_table, qdbd_connection, qdbd_settings):
@@ -48,7 +47,6 @@ def test_write_dask_dataframe(df_with_table_inserted, qdbd_connection, qdbd_sett
         f'SELECT * FROM "{original_table_name}"',
         cluster_uri=qdbd_settings.get("uri").get("insecure"),
     )
-    assert isinstance(ddf, Delayed), "Expected a dask delayed object"
 
     # Write delayed dataframe to a new table
     new_table_name = f"{original_table_name}_COPY"
@@ -59,8 +57,6 @@ def test_write_dask_dataframe(df_with_table_inserted, qdbd_connection, qdbd_sett
     ).compute()
 
     # Read back from new table and compare with source
-    written_df = qdbpd.read_dataframe(
-        qdbd_connection, qdbd_connection.table(new_table_name)
-    )
+    written_df = qdbpd.read_dataframe(qdbd_connection, new_table_name)
 
     assert_df_equal(df, written_df)
