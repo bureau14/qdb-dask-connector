@@ -148,3 +148,39 @@ def query(
     # persisted_parts is a list of Futures (or Delayed objects on fallback),
     # this code builds a single distributed dataframe out of those.
     return dd.from_delayed(persisted_parts, meta=meta, divisions=None)
+
+
+def write_dataframe(
+    df: dd.DataFrame | pd.DataFrame,
+    table_name: str,
+    *,
+    cluster_uri: str,
+    # python api options
+    user_name: str = "",
+    user_private_key: str = "",
+    cluster_public_key: str = "",
+    timeout: datetime.timedelta = datetime.timedelta(seconds=60),
+    enable_encryption: bool = False,
+    client_max_parallelism: int = 0,
+    # write dataframe options
+    create: bool = True,
+    shard_size: pendulum.Duration = pendulum.duration(days=1),
+):
+    """
+    Writes DataFrame to a QuasarDB table.
+
+    Takes either a Dask DataFrame or a Pandas DataFrame and writes it to the specified QuasarDB table.
+
+    Returns a delayed object that can be computed to perform the write operation.
+    """
+    conn_kwargs = {
+        "uri": cluster_uri,
+        "user_name": user_name,
+        "user_private_key": user_private_key,
+        "cluster_public_key": cluster_public_key,
+        "timeout": timeout,
+        "enable_encryption": enable_encryption,
+        "client_max_parallelism": client_max_parallelism,
+    }
+
+    return delayed(write_df)(df, table_name, conn_kwargs, create, shard_size)

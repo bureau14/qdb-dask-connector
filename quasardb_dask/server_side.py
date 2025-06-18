@@ -523,3 +523,31 @@ def materialize_to_temp(
             )
             for rng in ranges
         ]
+
+
+def write_df(
+    df: pd.DataFrame,
+    table_name: str,
+    # conn options
+    conn_kwargs: dict,
+    # write options
+    create: bool = True,
+    shard_size: pendulum.Duration = pendulum.duration(days=1),
+) -> None:
+    """
+    Write a DataFrame to a QuasarDB table.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame to write.
+    conn_kwargs : dict
+        Connection parameters for the QuasarDB cluster.
+    table_name : str
+    create : bool, default True
+    shard_size : pendulum.Duration, default 1 day
+    """
+    with quasardb.Cluster(**conn_kwargs) as conn:
+        qdbpd.write_dataframe(
+            df, conn, table=table_name, create=create, shard_size=shard_size
+        )
