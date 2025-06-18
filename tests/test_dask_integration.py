@@ -23,7 +23,7 @@ logger = logging.getLogger("test-dask-integration")
     ],
 )
 def test_dask_query_exception_on_non_select_query(qdbd_settings, query):
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(ValueError):
         qdbdsk.query(query, cluster_uri=qdbd_settings.get("uri").get("insecure"))
 
 
@@ -33,7 +33,7 @@ def test_dask_query_meta_set(df_with_table, qdbd_connection, qdbd_settings):
     tests that the meta is set correctly in the dask DataFrame
     """
     _, _, query = prepare_query_test(df_with_table, qdbd_connection)
-    df = qdbpd.query(qdbd_connection, query)
+    df = qdbpd.query(qdbd_connection, query, index="$timestamp")
     ddf = qdbdsk.query(query, cluster_uri=qdbd_settings.get("uri").get("insecure"))
 
     dask_meta = ddf._meta_nonempty
@@ -69,6 +69,9 @@ def test_dask_query_lazy_evaluation(df_with_table, qdbd_connection, qdbd_setting
     assert isinstance(result, pd.DataFrame)
 
 
+@pytest.mark.skip(
+    reason="right now simple queries are not split, once sc-16768/add-function-that-splits-query-to-the-c-api is done this test can be enabled/fixed"
+)
 @conftest.override_cdtypes([np.dtype("float64")])
 @pytest.mark.parametrize("row_count", [224], ids=["row_count=224"], indirect=True)
 @pytest.mark.parametrize("sparsify", [100], ids=["sparsify=none"], indirect=True)
@@ -126,7 +129,7 @@ def test_dask_can_do_math_on_dask_dataframe(
 
     assert isinstance(ddf, dd.DataFrame)
 
-    number_column = df.columns[-1]
+    number_column = df.columns[-1]  # assumes that last column is numeric
 
     ddf[f"sum_{number_column}"] = ddf[number_column].sum()
     ddf[f"mean_{number_column}"] = ddf[number_column].mean()
