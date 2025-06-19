@@ -527,12 +527,12 @@ def materialize_to_temp(
 
 def write_df(
     df: pd.DataFrame,
-    table_name: str,
     # conn options
     conn_kwargs: dict,
     # write options
+    table: str,
     create: bool = True,
-    shard_size: pendulum.Duration = pendulum.duration(days=1),
+    **writer_kwargs,
 ) -> None:
     """
     Write a DataFrame to a QuasarDB table.
@@ -543,13 +543,13 @@ def write_df(
         DataFrame to write.
     conn_kwargs : dict
         Connection parameters for the QuasarDB cluster.
-    table_name : str
+    table : str
     create : bool, default True
-    shard_size : pendulum.Duration, default 1 day
+    writer_kwargs : dict
+        Additional keyword arguments passed to `quasardb.pandas.write_dataframe`.
     """
-    # make sure the DataFrame has correct index
-    _coerce_timestamp_index(df)
-    # drop internal columns
+    # drop internal columns before writing
+    # otherwise there would be an error for reserved alias
     df.drop(
         columns=[c for c in df.columns if c.startswith("$")],
         inplace=True,
@@ -559,8 +559,7 @@ def write_df(
         qdbpd.write_dataframe(
             df,
             conn,
-            table_name,
+            table=table,
             create=create,
-            shard_size=shard_size,
-            push_mode=quasardb.WriterPushMode.Fast,
+            **writer_kwargs,
         )

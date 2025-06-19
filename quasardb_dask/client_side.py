@@ -152,7 +152,7 @@ def query(
 
 def write_dataframe(
     df: dd.DataFrame | pd.DataFrame,
-    table_name: str,
+    table: str,
     *,
     cluster_uri: str,
     # python api options
@@ -164,7 +164,7 @@ def write_dataframe(
     client_max_parallelism: int = 0,
     # write dataframe options
     create: bool = True,
-    shard_size: pendulum.Duration = pendulum.duration(days=1),
+    **kwargs,
 ):
     """
     Writes DataFrame to a QuasarDB table.
@@ -184,4 +184,4 @@ def write_dataframe(
         "client_max_parallelism": client_max_parallelism,
     }
 
-    return delayed(write_df)(df, table_name, conn_kwargs, create, shard_size)
+    return delayed(write_df)(df, conn_kwargs, table, create, **kwargs)

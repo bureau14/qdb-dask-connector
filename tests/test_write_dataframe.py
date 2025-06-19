@@ -4,7 +4,6 @@ from utils import assert_df_equal
 import quasardb.pandas as qdbpd
 from dask.delayed import Delayed
 
-
 logger = logging.getLogger("test-write-dataframe")
 
 
@@ -15,7 +14,7 @@ def test_write_dataframe_is_lazy(df_with_table, qdbd_connection, qdbd_settings):
     write_task = qdbdask.write_dataframe(
         df,
         cluster_uri=qdbd_settings.get("uri").get("insecure"),
-        table_name=table_name,
+        table=table_name,
         create=False,
     )
 
@@ -29,7 +28,7 @@ def test_write_pandas_dataframe(df_with_table, qdbd_connection, qdbd_settings):
     table_name = table.get_name()
 
     qdbdask.write_dataframe(
-        df, cluster_uri=qdbd_settings.get("uri").get("insecure"), table_name=table_name
+        df, cluster_uri=qdbd_settings.get("uri").get("insecure"), table=table_name
     ).compute()
 
     # Verify that the written dataframe matches the original
@@ -52,7 +51,7 @@ def test_write_dask_dataframe(df_with_table_inserted, qdbd_connection, qdbd_sett
     new_table_name = f"{original_table_name}_COPY"
     qdbdask.write_dataframe(
         ddf,
-        table_name=new_table_name,
+        table=new_table_name,
         cluster_uri=qdbd_settings.get("uri").get("insecure"),
     ).compute()
 
