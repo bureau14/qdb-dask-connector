@@ -540,6 +540,7 @@ def write_df(
     """
     Creates a connection and writes dataframe to a QuasarDB table.
     """
+    _coerce_timestamp_index(df)
     # drop internal columns before writing
     # otherwise there would be an error for reserved alias
     df.drop(
