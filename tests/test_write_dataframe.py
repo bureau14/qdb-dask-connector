@@ -23,8 +23,8 @@ def test_write_dataframe_is_lazy(df_with_table, qdbd_settings):
         create=False,
     )
 
-    assert (
-        type(write_task) == Delayed
+    assert isinstance(
+        write_task, Delayed
     ), "write_dataframe should return a dask delayed object"
 
 
