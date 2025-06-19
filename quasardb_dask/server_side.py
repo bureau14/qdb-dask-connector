@@ -533,7 +533,9 @@ def _drop_special_columns(
     columns_to_drop = []
     for col in df.columns:
         if col.startswith("$") and col not in columns_to_skip:
-            logger.warning('Dataframe contains reserved column "%s", ', col)
+            logger.warning(
+                'Dataframe contains reserved column "%s", column will be removed', col
+            )
             columns_to_drop.append(col)
 
     df.drop(columns=columns_to_drop, inplace=True)
