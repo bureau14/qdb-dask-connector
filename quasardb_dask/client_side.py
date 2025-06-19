@@ -4,7 +4,7 @@ import pandas as pd
 
 import dask.dataframe as dd
 from dask.distributed import get_client, wait
-from dask.delayed import delayed
+from dask.delayed import delayed, Delayed
 
 logger = logging.getLogger("quasardb_dask")
 
@@ -197,13 +197,14 @@ def write_dataframe(
     deduplicate: bool = False,
     deduplication_mode="drop",
     infer_types=True,
-):
+) -> Delayed:
     """
     Writes DataFrame to a QuasarDB table.
 
     Accepts either a Dask DataFrame or a Pandas DataFrame and writes it to the specified QuasarDB table.
 
-    Returns a delayed object that can be computed to perform the write operation.
+    Returns a delayed object that **must** be computed to perform the write operation.
+    On successful completion, delayed object returns True.
 
     Base parameters
     ----------

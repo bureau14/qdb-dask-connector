@@ -524,6 +524,21 @@ def materialize_to_temp(
         ]
 
 
+def _drop_special_columns(
+    df: pd.DataFrame, columns_to_skip: list[str] = ["$timestamp"]
+) -> pd.DataFrame:
+    """
+    Drops internal columns from the DataFrame that start with '$'. By default skips $timestamp column.
+    """
+    columns_to_drop = []
+    for col in df.columns:
+        if col.startswith("$") and col not in columns_to_skip:
+            logger.warning('Dataframe contains reserved column "%s", ', col)
+            columns_to_drop.append(col)
+
+    df.drop(columns=columns_to_drop, inplace=True)
+
+
 def write_df(
     df: pd.DataFrame,
     # conn options
@@ -536,17 +551,16 @@ def write_df(
     deduplicate: bool,
     infer_types: bool,
     deduplication_mode: str,
-) -> None:
+) -> bool:
     """
     Creates a connection and writes dataframe to a QuasarDB table.
+
+    Returns True on success.
     """
     _coerce_timestamp_index(df)
     # drop internal columns before writing
     # otherwise there would be an error for reserved alias
-    df.drop(
-        columns=[c for c in df.columns if c.startswith("$")],
-        inplace=True,
-    )
+    _drop_special_columns(df)
 
     with quasardb.Cluster(**conn_kwargs) as conn:
         qdbpd.write_dataframe(
@@ -560,3 +574,5 @@ def write_df(
             deduplication_mode=deduplication_mode,
             infer_types=infer_types,
         )
+
+    return True
