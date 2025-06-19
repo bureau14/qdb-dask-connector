@@ -1,7 +1,6 @@
 import logging
 import pandas as pd
 import numpy as np
-import math
 import pendulum  # easy date/time interaction
 from ksuid import Ksuid  # k-sortable identifiers for temporary tables
 
@@ -531,22 +530,15 @@ def write_df(
     conn_kwargs: dict,
     # write options
     table: str,
-    create: bool = True,
-    **writer_kwargs,
+    create: bool,
+    push_mode: quasardb.WriterPushMode,
+    shard_size: pendulum.Duration,
+    deduplicate: bool,
+    infer_types: bool,
+    deduplication_mode: str,
 ) -> None:
     """
-    Write a DataFrame to a QuasarDB table.
-
-    Parameters
-    ----------
-    df : pandas.DataFrame
-        DataFrame to write.
-    conn_kwargs : dict
-        Connection parameters for the QuasarDB cluster.
-    table : str
-    create : bool, default True
-    writer_kwargs : dict
-        Additional keyword arguments passed to `quasardb.pandas.write_dataframe`.
+    Creates a connection and writes dataframe to a QuasarDB table.
     """
     # drop internal columns before writing
     # otherwise there would be an error for reserved alias
@@ -561,5 +553,9 @@ def write_df(
             conn,
             table=table,
             create=create,
-            **writer_kwargs,
+            push_mode=push_mode,
+            shard_size=shard_size,
+            deduplicate=deduplicate,
+            deduplication_mode=deduplication_mode,
+            infer_types=infer_types,
         )

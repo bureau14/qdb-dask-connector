@@ -1,8 +1,5 @@
 import re
-import sys
 import logging
-import datetime
-import dateparser
 import pandas as pd
 
 import dask.dataframe as dd
@@ -40,7 +37,7 @@ def query(
     user_name: str = "",
     user_private_key: str = "",
     cluster_public_key: str = "",
-    timeout: datetime.timedelta = datetime.timedelta(seconds=60),
+    timeout: pendulum.Duration = pendulum.Duration(seconds=60),
     enable_encryption: bool = False,
     client_max_parallelism: int = 0,
     # temporary hack until we get the `qdb_query_validate` function implemented,
@@ -49,6 +46,37 @@ def query(
     meta: pd.DataFrame = None,
     npartitions: int = 1,  # The number of dask partitions to return, which enables parallelization of input queries
 ):
+    """
+    Base parameters
+    ----------
+    query : str
+        Query to execute. Must be a valid SELECT statement.
+
+    Connection parameters
+    -------------------
+    user_name : str
+        The username to authenticate with the QuasarDB cluster.
+    user_private_key : str
+        The private key of the user to authenticate with the QuasarDB cluster.
+    cluster_public_key : str
+        The public key of the QuasarDB cluster to authenticate with.
+    cluster_uri : str
+        The URI of the QuasarDB cluster to connect to, e.g. `qdb://127.0.0.1:2836`.
+    timeout : pendulum.Duration
+        The timeout for the connection to the QuasarDB cluster. Defaults to 60 seconds.
+    enable_encryption : bool
+        If true, enables encryption for the connection to the QuasarDB cluster. Defaults to False. Requires encryption to be enabled on the QuasarDB cluster. Requires encryption to be enabled on the QuasarDB cluster.
+    client_max_parallelism : int
+        The maximum number of parallel operations that the client can perform. Defaults to 0.
+
+    Dask parameters
+    -------------------
+    meta : pandas.DataFrame
+        Metadata DataFrame that describes the schema of the result. If not provided, the function will attempt to infer the schema by executing a metadata query.
+
+    npartitions : int
+        The number of partitions to split the query into. Defaults to 1.
+    """
     _ensure_select_query(query)
 
     conn_kwargs = {
@@ -159,12 +187,16 @@ def write_dataframe(
     user_name: str = "",
     user_private_key: str = "",
     cluster_public_key: str = "",
-    timeout: datetime.timedelta = datetime.timedelta(seconds=60),
+    timeout: pendulum.Duration = pendulum.Duration(seconds=60),
     enable_encryption: bool = False,
     client_max_parallelism: int = 0,
     # write dataframe options
     create: bool = True,
-    **kwargs,
+    push_mode=quasardb.WriterPushMode.Fast,
+    shard_size: pendulum.Duration = pendulum.Duration(days=1),
+    deduplicate: bool = False,
+    deduplication_mode="drop",
+    infer_types=True,
 ):
     """
     Writes DataFrame to a QuasarDB table.
@@ -172,6 +204,58 @@ def write_dataframe(
     Accepts either a Dask DataFrame or a Pandas DataFrame and writes it to the specified QuasarDB table.
 
     Returns a delayed object that can be computed to perform the write operation.
+
+    Base parameters
+    ----------
+    df : pandas.DataFrame | dask.DataFrame
+        DataFrame to write to the QuasarDB table.
+
+    Connection parameters
+    -------------------
+    user_name : str
+        The username to authenticate with the QuasarDB cluster.
+    user_private_key : str
+        The private key of the user to authenticate with the QuasarDB cluster.
+    cluster_public_key : str
+        The public key of the QuasarDB cluster to authenticate with.
+    cluster_uri : str
+        The URI of the QuasarDB cluster to connect to, e.g. `qdb://127.0.0.1:2836`.
+    timeout : pendulum.Duration
+        The timeout for the connection to the QuasarDB cluster. Defaults to 60 seconds.
+    enable_encryption : bool
+        If true, enables encryption for the connection to the QuasarDB cluster. Defaults to False
+    client_max_parallelism : int
+        The maximum number of parallel operations that the client can perform.
+
+    Writer parameters
+    -------------------
+    table : str
+        The name of the QuasarDB table to write the data to.
+    push_mode : quasardb.WriterPushMode
+        The mode used for inserting data. Defaults to `Fast`.
+
+        Available options:
+
+        * Truncate: Truncates (also referred to as upserts) the data in-place. Will detect time range to truncate from the time range inside the dataframe.
+
+        * Async: Uses asynchronous insertion API where commits are buffered server-side and acknowledged before they are written to disk.
+
+        * Fast: Enables “fast push” for small batch inserts.
+
+        * Transactional: Ensures full transactional consistency.
+    create : bool
+        If true, automatically creates the table if it did not yet exist.
+
+    shard_size : datetime.timedelta
+        If create is True and a table is to be created, uses this value as the shard size. If not, uses QuasarDB’s default shard size (1d).
+    deduplicate : bool
+        When deduplicate is enabled, specifies how deduplication should be performed. When 'drop', it drops any new data when a duplicate was previously stored. When 'upsert', it replaces the old data with the new data.
+    deduplication_mode : str
+        When deduplicate is enabled, specifies how deduplication should be performed. When 'drop', it drops any new data when a duplicate was previously stored. When 'upsert', it replaces the old data with the new data.
+    infer_types : bool
+        If true, will attempt to convert types from Python to QuasarDB native types if the provided dataframe has incompatible types.
+
+        **Important**: as conversions are expensive and often the majority of time spent when inserting data into QuasarDB, we strongly recommend setting this to False for performance-sensitive code.
     """
 
     conn_kwargs = {
@@ -184,4 +268,14 @@ def write_dataframe(
         "client_max_parallelism": client_max_parallelism,
     }
 
-    return delayed(write_df)(df, conn_kwargs, table, create, **kwargs)
+    return delayed(write_df)(
+        df,
+        conn_kwargs,
+        table,
+        create,
+        push_mode,
+        shard_size,
+        deduplicate,
+        infer_types,
+        deduplication_mode,
+    )

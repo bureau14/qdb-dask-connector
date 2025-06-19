@@ -9,7 +9,6 @@ authors = [
 description = "Integration between QuasarDB's Python API and Dask DataFrame"
 dependencies = [
     "dask[complete]",
-    "dateparser",
     "pandas",
     "svix-ksuid",
     "pendulum",
