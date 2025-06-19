@@ -547,7 +547,9 @@ def write_df(
     # this addresses the case where the user passed a result of a "SELECT * FROM table" query,
     # which would have a $table column in it
     # without this we would get an error for reserved alias
-    df.drop(columns=["$table"], inplace=True, errors="ignore")
+    if "$table" in df.columns:
+        logger.warning("Dropping internal $table column before writing!")
+        df.drop(columns=["$table"], inplace=True, errors="ignore")
 
     with quasardb.Cluster(**conn_kwargs) as conn:
         qdbpd.write_dataframe(
