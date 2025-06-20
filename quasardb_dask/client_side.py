@@ -179,7 +179,7 @@ def query(
 
 
 def write_dataframe(
-    df: dd.DataFrame | pd.DataFrame,
+    df: Union[dd.DataFrame, pd.DataFrame],  # type: ignore
     table: str,
     *,
     cluster_uri: str,
