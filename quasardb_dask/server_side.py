@@ -114,9 +114,9 @@ def create_partition_tasks(
     conn_kwargs: dict,
     query_kwargs: dict,
     npartitions: int,
-) -> list[
-    tuple
-]:  # XXX:igor this should be `list[tuple[str, str] | tuple[str, dict]]` but Python versions < 3.10 don't support that syntax
+) -> List[
+    Union[Tuple[str, str], Tuple[str, dict]]
+]:  # XXX:igor this should be `list[tuple[str, str] | tuple[str, dict]]` but Python versions < 3.10 don't support that syntax, as a workaround we use `typing` here
     """
     Decompose *query* into smaller, independent tasks that can be executed as
     separate Dask partitions.
