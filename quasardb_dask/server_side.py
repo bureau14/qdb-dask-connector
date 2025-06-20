@@ -3,7 +3,6 @@ import pandas as pd
 import numpy as np
 import pendulum  # easy date/time interaction
 from ksuid import Ksuid  # k-sortable identifiers for temporary tables
-from typing import List, Tuple, Union
 
 logger = logging.getLogger("quasardb_dask")
 
