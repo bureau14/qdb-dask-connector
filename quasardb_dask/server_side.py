@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import pendulum  # easy date/time interaction
 from ksuid import Ksuid  # k-sortable identifiers for temporary tables
+from typing import List, Tuple, Union
 
 logger = logging.getLogger("quasardb_dask")
 
@@ -113,7 +114,9 @@ def create_partition_tasks(
     conn_kwargs: dict,
     query_kwargs: dict,
     npartitions: int,
-) -> list[tuple[str, str] | tuple[str, dict]]:
+) -> list[
+    tuple
+]:  # XXX:igor this should be `list[tuple[str, str] | tuple[str, dict]]` but Python versions < 3.10 don't support that syntax
     """
     Decompose *query* into smaller, independent tasks that can be executed as
     separate Dask partitions.
