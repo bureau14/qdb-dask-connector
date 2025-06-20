@@ -179,7 +179,9 @@ def query(
 
 
 def write_dataframe(
-    df: Union[dd.DataFrame, pd.DataFrame],  # type: ignore
+    df: Union[
+        dd.DataFrame, pd.DataFrame
+    ],  # XXX:igor should be `dd.DataFrame | pd.DataFrame` we have to use `typing` module because its not available in Python<3.10
     table: str,
     *,
     cluster_uri: str,
