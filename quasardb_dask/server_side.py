@@ -202,7 +202,9 @@ def get_meta(query: str, conn_kwargs: dict, query_kwargs: dict) -> pd.DataFrame:
 
 
 def run_partition_task(
-    task: tuple[str, str] | tuple[str, dict],
+    task: Union[
+        Tuple[str, str], Tuple[str, dict]
+    ],  # XXX:igor should be tuple[str, str] | tuple[str, dict], but Python versions < 3.10 don't support that syntax, as a workaround we use `typing` here
     meta: pd.DataFrame,
     conn_kwargs: dict,
     query_kwargs: dict,
