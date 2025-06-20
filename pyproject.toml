@@ -24,6 +24,9 @@ build-backend = "setuptools.build_meta"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
+[tool.setuptools.packages.find]
+include = ["quasardb_dask"]
+
 [tool.black]
 line-length = 88
 target-version = ['py39', 'py310', 'py311', 'py312', 'py313']
