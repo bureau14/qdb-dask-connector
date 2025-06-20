@@ -1,7 +1,6 @@
 import logging
 import pandas as pd
 import numpy as np
-import math
 import pendulum  # easy date/time interaction
 from ksuid import Ksuid  # k-sortable identifiers for temporary tables
 
@@ -523,3 +522,46 @@ def materialize_to_temp(
             )
             for rng in ranges
         ]
+
+
+def write_df(
+    df: pd.DataFrame,
+    # conn options
+    conn_kwargs: dict,
+    # write options
+    table: str,
+    create: bool,
+    push_mode: quasardb.WriterPushMode,
+    shard_size: pendulum.Duration,
+    deduplicate: bool,
+    infer_types: bool,
+    deduplication_mode: str,
+) -> bool:
+    """
+    Creates a connection and writes dataframe to a QuasarDB table.
+
+    Returns True on success.
+    """
+    _coerce_timestamp_index(df)
+    # drop internal $table column before writing
+    # this addresses the case where the user passed a result of a "SELECT * FROM table" query,
+    # which would have a $table column in it
+    # without this we would get an error for reserved alias
+    if "$table" in df.columns:
+        logger.warning("Dropping internal $table column before writing!")
+        df.drop(columns=["$table"], inplace=True, errors="ignore")
+
+    with quasardb.Cluster(**conn_kwargs) as conn:
+        qdbpd.write_dataframe(
+            df,
+            conn,
+            table=table,
+            create=create,
+            push_mode=push_mode,
+            shard_size=shard_size,
+            deduplicate=deduplicate,
+            deduplication_mode=deduplication_mode,
+            infer_types=infer_types,
+        )
+
+    return True

@@ -9,7 +9,6 @@ authors = [
 description = "Integration between QuasarDB's Python API and Dask DataFrame"
 dependencies = [
     "dask[complete]",
-    "dateparser",
     "pandas",
     "svix-ksuid",
     "pendulum",
@@ -25,8 +24,11 @@ build-backend = "setuptools.build_meta"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
+[tool.setuptools.packages.find]
+include = ["quasardb_dask"]
+
 [tool.black]
 line-length = 88
-target-version = ['py39', 'py310', 'py311', 'py312', 'py313']
+target-version = ['py311', 'py312', 'py313']
 include = '\.py?$'
 required-version = '24'

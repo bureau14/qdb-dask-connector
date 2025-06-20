@@ -3,6 +3,8 @@ set -u -x
 
 PYTHON="${PYTHON_CMD:-python3}"
 
+echo "Python version: "
+${PYTHON} --version
 
 if [[ -d "dist/" ]]
 then

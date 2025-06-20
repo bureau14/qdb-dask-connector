@@ -469,3 +469,16 @@ def override_cdtypes(args):
 @pytest.fixture(params=native_cdtypes, ids=_cdtype_to_param_id)
 def gen_cdtype(request):
     yield request.param
+
+
+@pytest.fixture
+def df_with_table_inserted(df_with_table, qdbd_connection):
+    """
+    Returns a DataFrame that has been written to the table, and the table itself.
+    """
+    (_, _, df, table) = df_with_table
+
+    # Write the DataFrame to the table
+    qdbpd.write_dataframe(df, qdbd_connection, table)
+
+    return (df, table)
