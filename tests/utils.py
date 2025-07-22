@@ -54,7 +54,7 @@ def prepare_query_test(
 ):
     (_, _, df, table) = df_with_table
 
-    qdbpd.write_dataframe(df, qdbd_connection, table, write_through=True)
+    qdbpd.write_dataframe(df, qdbd_connection, table)
     table_name = table.get_name()
     q = 'SELECT {} FROM "{}"'.format(columns, table_name)
 
