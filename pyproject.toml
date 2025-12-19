@@ -1,7 +1,7 @@
 [project]
 requires-python = ">=3.11"
 name = "quasardb-dask"
-version = "0.1-dev"
+version = "3.15.0.dev0"
 authors = [
     {name = "quasardb SAS"},
     {email="contact@quasardb.net" },
