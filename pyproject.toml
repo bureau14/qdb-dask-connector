@@ -4,7 +4,7 @@ name = "quasardb-dask"
 version = "3.14.3.dev0"
 authors = [
     {name = "quasardb SAS"},
-    {email="contact@quasardb.net" },
+    {email="support@quasar.ai" },
 ]
 description = "Integration between QuasarDB's Python API and Dask DataFrame"
 dependencies = [
@@ -13,6 +13,9 @@ dependencies = [
     "svix-ksuid",
     "pendulum",
 ]
+
+[project.urls]
+Homepage = "https://www.quasar.ai"
 
 [project.optional-dependencies]
 python = ["quasardb"]
