@@ -42,7 +42,15 @@ def test_dask_query_meta_set(df_with_table, qdbd_connection, qdbd_settings):
     assert dask_meta.columns.names == pandas_cols.names, "column names do not match"
 
     for col_name in pandas_cols:
-        # treat string[pyarrow] as object
+
+        # Dask returns $table column as object
+        # Pandas since version 3.0 returns it as string (before it was object as well)
+        # we treat them as equivalent for the purpose of this test
+        if col_name == "$table":
+            dask_meta[col_name] = dask_meta[col_name].astype("str")
+
+        # Dask returns Blob columns as string[pyarrow], while quasardb.pandas returns them as object
+        # we treat them as equivalent for the purpose of this test
         if dask_meta[col_name].dtype == "string[pyarrow]":
             dask_meta[col_name] = dask_meta[col_name].astype("object")
 
