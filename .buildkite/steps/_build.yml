@@ -27,7 +27,7 @@ plugins:
               - "*-utils.tar.zst!*"
       upload:
         files:
-          - "dist/qdb_cloudwatch-*.whl"
+          - "dist/quasardb_dask-*.whl"
         base_dir: "dist"
       promote: {}
   - bureau14/qdb-test-report#master:
