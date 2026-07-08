@@ -55,6 +55,7 @@ PYTHON_VERSIONS = [
 GLOBAL_ENV: dict[str, str] = {
     "JUNIT_XML_FILE": "tests/pytest.xml",
     "QDB_ENCRYPT_TRAFFIC": "1",
+    "QDB_ENABLE_FIREHOSE": "0"
 }
 
 STEP_ENV: dict[str, dict[str, str]] = {}
