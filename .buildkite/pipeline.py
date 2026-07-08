@@ -55,7 +55,7 @@ PYTHON_VERSIONS = [
 GLOBAL_ENV: dict[str, str] = {
     "JUNIT_XML_FILE": "tests/pytest.xml",
     "QDB_ENCRYPT_TRAFFIC": "1",
-    "QDB_ENABLE_FIREHOSE": "0"
+    "QDB_ENABLE_FIREHOSE": "0",
 }
 
 STEP_ENV: dict[str, dict[str, str]] = {}
@@ -144,7 +144,7 @@ def generate_pipeline() -> Pipeline:
     for group, steps in group_steps.items():
         group_step = GroupStep(group=group, steps=steps)
         pipeline.add_step(group_step)
-    
+
     step = load_template(STEPS_DIR / "_test_report.yml")
     step["depends_on"] = jobs
     pipeline.add_step(CommandStep.from_dict(step))
