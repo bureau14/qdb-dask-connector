@@ -1,1 +1,1 @@
-black[colorama]==24.10.0
+black[colorama]==26.3.1
