@@ -1,7 +1,7 @@
 [project]
 requires-python = ">=3.11"
 name = "quasardb-dask"
-version = "3.14.3"
+version = "3.14.4.dev0"
 authors = [
     {name = "quasardb SAS"},
     {email="support@quasar.ai" },
@@ -18,7 +18,7 @@ dependencies = [
 Homepage = "https://www.quasar.ai"
 
 [project.optional-dependencies]
-python = ["quasardb==3.14.3"]
+python = ["quasardb==3.14.4.dev0"]
 
 [build-system]
 requires = ["setuptools", "build", "wheel"]
